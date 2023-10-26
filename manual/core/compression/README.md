@@ -74,7 +74,7 @@ Dependency:
 <dependency>
   <groupId>org.xerial.snappy</groupId>
   <artifactId>snappy-java</artifactId>
-  <version>1.1.2.6</version>
+  <version>1.1.10.4</version>
 </dependency>
 ```
 
