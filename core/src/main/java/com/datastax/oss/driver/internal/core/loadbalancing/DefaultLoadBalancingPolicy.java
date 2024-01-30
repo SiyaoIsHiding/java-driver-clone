@@ -265,26 +265,64 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     return ThreadLocalRandom.current().nextInt(4);
   }
 
+  private Map<Node, Boolean> healthCache = new ConcurrentHashMap<>();
+
   protected boolean isUnhealthy(@NonNull Node node, @NonNull Session session, long now) {
-    return isBusy(node, session) && isResponseRateInsufficient(node, now);
+    boolean busy = isBusy(node, session);
+    boolean slow = isResponseRateInsufficient(node, now);
+    boolean unhealthy = busy && slow;
+    if (healthCache.containsKey(node) && healthCache.get(node) != unhealthy) {
+      LOG.info(
+          "[{}] Node {} is considered {} now because it is {} and {}",
+          logPrefix,
+          node,
+          unhealthy ? "unhealthy" : "healthy",
+          busy ? "busy" : "not busy",
+          slow ? "slow" : "not slow");
+    }
+    healthCache.put(node, unhealthy);
+    return unhealthy;
   }
 
+  private Map<Node, Integer> inflightCache = new ConcurrentHashMap<>();
+  private Map<Node, Boolean> responseRateCache = new ConcurrentHashMap<>();
+
   protected boolean isBusy(@NonNull Node node, @NonNull Session session) {
-    return getInFlight(node, session) >= MAX_IN_FLIGHT_THRESHOLD;
+    int inflight = getInFlight(node, session);
+    boolean isBusy = inflight >= MAX_IN_FLIGHT_THRESHOLD;
+    if (inflightCache.containsKey(node) && (inflight - 10) * (inflightCache.get(node) - 10) < 0) {
+      // "isBusy" changed
+      LOG.info(
+          "[{}] Node {} is considered {} now because it has {} in-flight requests",
+          logPrefix,
+          node,
+          isBusy ? "busy" : "not busy",
+          inflight);
+    }
+
+    LOG.info("[{}] Node {} checked. It has {} in-flight requests", logPrefix, node, inflight);
+
+    inflightCache.put(node, inflight);
+    return isBusy;
   }
 
   protected boolean isResponseRateInsufficient(@NonNull Node node, long now) {
     // response rate is considered insufficient when less than 2 responses were obtained in
     // the past interval delimited by RESPONSE_COUNT_RESET_INTERVAL_NANOS.
+    boolean isSlow = true;
     if (responseTimes.containsKey(node)) {
       AtomicLongArray array = responseTimes.get(node);
       if (array.length() == 2) {
         long threshold = now - RESPONSE_COUNT_RESET_INTERVAL_NANOS;
         long leastRecent = array.get(0);
-        return leastRecent - threshold < 0;
+        isSlow = leastRecent < threshold;
       }
     }
-    return true;
+    if (responseRateCache.containsKey(node) && responseRateCache.get(node) != isSlow) {
+      // "isSlow" changed
+      LOG.info("[{}] Node {} is considered {} now", logPrefix, node, isSlow ? "slow" : "not slow");
+    }
+    return isSlow;
   }
 
   protected void updateResponseTimes(@NonNull Node node) {
