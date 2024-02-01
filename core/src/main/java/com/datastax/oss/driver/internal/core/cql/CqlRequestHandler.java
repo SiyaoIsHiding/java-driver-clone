@@ -130,6 +130,7 @@ public class CqlRequestHandler implements Throttled {
   // The errors on the nodes that were already tried (lazily initialized on the first error).
   // We don't use a map because nodes can appear multiple times.
   private volatile List<Map.Entry<Node, Throwable>> errors;
+  private volatile List<Node> nodesSent = new CopyOnWriteArrayList<>();
 
   protected CqlRequestHandler(
       Statement<?> statement,
@@ -208,7 +209,8 @@ public class CqlRequestHandler implements Throttled {
             (Timeout timeout1) ->
                 setFinalError(
                     initialStatement,
-                    new DriverTimeoutException("Query timed out after " + timeoutDuration),
+                    new DriverTimeoutException(
+                        "Query timed out after " + timeoutDuration, nodesSent),
                     null,
                     -1),
             timeoutDuration.toNanos(),
@@ -283,6 +285,7 @@ public class CqlRequestHandler implements Throttled {
           .write(message, statement.isTracing(), statement.getCustomPayload(), nodeResponseCallback)
           .addListener(nodeResponseCallback);
     }
+    nodesSent.add(node);
   }
 
   private void recordError(Node node, Throwable error) {

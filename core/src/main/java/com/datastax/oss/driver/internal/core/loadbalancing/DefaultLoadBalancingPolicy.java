@@ -290,7 +290,9 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   protected boolean isBusy(@NonNull Node node, @NonNull Session session) {
     int inflight = getInFlight(node, session);
     boolean isBusy = inflight >= MAX_IN_FLIGHT_THRESHOLD;
-    if (inflightCache.containsKey(node) && (inflight - 10) * (inflightCache.get(node) - 10) < 0) {
+    if (inflightCache.containsKey(node)
+        && ((inflightCache.get(node) >= 10 && inflight < 10)
+            || (inflightCache.get(node) < 10 && inflight >= 10))) {
       // "isBusy" changed
       LOG.info(
           "[{}] Node {} is considered {} now because it has {} in-flight requests",
@@ -300,7 +302,9 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
           inflight);
     }
 
-    LOG.info("[{}] Node {} checked. It has {} in-flight requests", logPrefix, node, inflight);
+    if (inflight >= 0) {
+      LOG.trace("[{}] Node {} checked. It has {} in-flight requests", logPrefix, node, inflight);
+    }
 
     inflightCache.put(node, inflight);
     return isBusy;
@@ -322,6 +326,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       // "isSlow" changed
       LOG.info("[{}] Node {} is considered {} now", logPrefix, node, isSlow ? "slow" : "not slow");
     }
+    responseRateCache.put(node, isSlow);
     return isSlow;
   }
 
