@@ -203,7 +203,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(pool3.getInFlight()).willReturn(0);
     given(pool5.getInFlight()).willReturn(0);
 
-    dsePolicy.responseTimes.put(node1, new AtomicLongArray(new long[] {T0, T0})); // unhealthy
+//    dsePolicy.responseTimes.put(node1, new AtomicLongArray(new long[] {T0, T0})); // unhealthy
 
     // When
     Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
@@ -232,7 +232,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(pool3.getInFlight()).willReturn(0);
     given(pool5.getInFlight()).willReturn(0);
 
-    dsePolicy.responseTimes.put(node1, new AtomicLongArray(new long[] {T1, T1})); // healthy
+//    dsePolicy.responseTimes.put(node1, new AtomicLongArray(new long[] {T1, T1})); // healthy
 
     // When
     Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
