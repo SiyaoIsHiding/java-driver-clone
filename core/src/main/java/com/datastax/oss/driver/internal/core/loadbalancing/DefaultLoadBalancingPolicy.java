@@ -106,7 +106,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     protected final Map<Node, Long> upTimes = new ConcurrentHashMap<>();
     private final boolean avoidSlowReplicas;
 
-    private final ConcurrentMap<Node, NodeLatencyTracker> latencies =
+    protected final ConcurrentMap<Node, NodeLatencyTracker> latencies =
             new ConcurrentHashMap<Node, NodeLatencyTracker>();
 
     public DefaultLoadBalancingPolicy(@NonNull DriverContext context, @NonNull String profileName) {
@@ -262,10 +262,10 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
         return ThreadLocalRandom.current().nextInt(4);
     }
 
-  private static class TimestampedAverage {
+  protected static class TimestampedAverage {
 
     private final long timestamp;
-    private final long average;
+    protected final long average;
     private final long nbMeasure;
 
     TimestampedAverage(long timestamp, long average, long nbMeasure) {
@@ -275,7 +275,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     }
   }
 
-  private static class NodeLatencyTracker {
+  protected static class NodeLatencyTracker {
 
     private final long thresholdToAccount;
     private final double scale;

@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -193,17 +194,18 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
   }
 
   @Test
-  public void should_prioritize_and_shuffle_3_or_more_replicas_when_first_unhealthy() {
+  public void
+      should_reorder_if_moving_average_faster() {
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
     given(tokenMap.getReplicas(KEYSPACE, ROUTING_KEY))
         .willReturn(ImmutableSet.of(node1, node3, node5));
-    given(pool1.getInFlight()).willReturn(100); // unhealthy
-    given(pool3.getInFlight()).willReturn(0);
-    given(pool5.getInFlight()).willReturn(0);
 
-//    dsePolicy.responseTimes.put(node1, new AtomicLongArray(new long[] {T0, T0})); // unhealthy
+    for(int i = 0; i < 100; i++) {
+      dsePolicy.onNodeSuccess(null, 100000000, null, node1, "");
+      dsePolicy.onNodeSuccess(null, 90000000, null, node3, "");
+    }
 
     // When
     Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
@@ -211,38 +213,40 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
 
     // Then
     // nodes 1, 3 and 5 always first, round-robin on the rest
-    // node1 is unhealthy = 1 -> bubbles down
-    assertThat(plan1).containsExactly(node3, node5, node1, node2, node4);
-    assertThat(plan2).containsExactly(node3, node5, node1, node4, node2);
+    // node 3 faster -> swap
+    assertThat(plan1).containsExactly(node3, node1, node5, node2, node4);
+    assertThat(plan2).containsExactly(node3, node1, node5, node4, node2);
 
     then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
     then(dsePolicy).should(times(2)).nanoTime();
     then(dsePolicy).should(never()).diceRoll1d4();
   }
 
+
   @Test
   public void
-      should_not_treat_node_as_unhealthy_if_has_in_flight_exceeded_but_response_times_normal() {
+  should_not_reorder_if_moving_average_obsolete() throws InterruptedException {
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
     given(tokenMap.getReplicas(KEYSPACE, ROUTING_KEY))
-        .willReturn(ImmutableSet.of(node1, node3, node5));
-    given(pool1.getInFlight()).willReturn(100); // unhealthy
-    given(pool3.getInFlight()).willReturn(0);
-    given(pool5.getInFlight()).willReturn(0);
+            .willReturn(ImmutableSet.of(node1, node3, node5));
 
-//    dsePolicy.responseTimes.put(node1, new AtomicLongArray(new long[] {T1, T1})); // healthy
+    for(int i = 0; i < 100; i++) {
+      dsePolicy.onNodeSuccess(null, 100000000, null, node1, "");
+      dsePolicy.onNodeSuccess(null, 90000000, null, node3, "");
+    }
 
+    Thread.sleep(20000);
     // When
     Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
     Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
 
     // Then
     // nodes 1, 3 and 5 always first, round-robin on the rest
-    // node1 has more in-flight than node3 -> swap
-    assertThat(plan1).containsExactly(node3, node1, node5, node2, node4);
-    assertThat(plan2).containsExactly(node3, node1, node5, node4, node2);
+    // node 3 faster -> swap
+    assertThat(plan1).containsExactly(node1, node3, node5, node2, node4);
+    assertThat(plan2).containsExactly(node1, node3, node5, node4, node2);
 
     then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
     then(dsePolicy).should(times(2)).nanoTime();
@@ -295,31 +299,6 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // majority of nodes unhealthy -> noop
     assertThat(plan1).containsExactly(node1, node3, node5, node2, node4);
     assertThat(plan2).containsExactly(node1, node3, node5, node4, node2);
-
-    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
-    then(dsePolicy).should(times(2)).nanoTime();
-    then(dsePolicy).should(never()).diceRoll1d4();
-  }
-
-  @Test
-  public void should_reorder_first_two_replicas_when_first_has_more_in_flight_than_second() {
-    // Given
-    given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
-    given(request.getRoutingKey()).willReturn(ROUTING_KEY);
-    given(tokenMap.getReplicas(KEYSPACE, ROUTING_KEY))
-        .willReturn(ImmutableSet.of(node1, node3, node5));
-    given(pool1.getInFlight()).willReturn(200);
-    given(pool3.getInFlight()).willReturn(100);
-
-    // When
-    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
-    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
-
-    // Then
-    // nodes 1, 3 and 5 always first, round-robin on the rest
-    // node1 has more in-flight than node3 -> swap
-    assertThat(plan1).containsExactly(node3, node1, node5, node2, node4);
-    assertThat(plan2).containsExactly(node3, node1, node5, node4, node2);
 
     then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
     then(dsePolicy).should(times(2)).nanoTime();
