@@ -27,7 +27,6 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
@@ -65,21 +64,24 @@ public class DefaultLoadBalancingPolicyRequestTrackerTest extends LoadBalancingP
   public void should_return_the_latency_if_it_does_not_change() {
 
     // When
-    for (int i = 0; i <100 ; i++){
+    for (int i = 0; i < 100; i++) {
       policy.onNodeSuccess(request, TimeUnit.MILLISECONDS.toNanos(100), profile, node1, logPrefix);
     }
 
     // Then
     assertThat(policy.latencies)
-        .hasEntrySatisfying(node1, tracker -> assertThat(tracker.getCurrentAverage().average).isEqualTo(TimeUnit.MILLISECONDS.toNanos(100)));
+        .hasEntrySatisfying(
+            node1,
+            tracker ->
+                assertThat(tracker.getCurrentAverage().average)
+                    .isEqualTo(TimeUnit.MILLISECONDS.toNanos(100)));
   }
-
 
   @Test
   public void should_less_than_highest_latency() {
 
     // When
-    for (int i = 0; i <100 ; i++){
+    for (int i = 0; i < 100; i++) {
       policy.onNodeSuccess(request, TimeUnit.MILLISECONDS.toNanos(100), profile, node1, logPrefix);
     }
 
@@ -87,6 +89,10 @@ public class DefaultLoadBalancingPolicyRequestTrackerTest extends LoadBalancingP
 
     // Then
     assertThat(policy.latencies)
-            .hasEntrySatisfying(node1, tracker -> assertThat(tracker.getCurrentAverage().average).isLessThan(TimeUnit.MILLISECONDS.toNanos(100)));
+        .hasEntrySatisfying(
+            node1,
+            tracker ->
+                assertThat(tracker.getCurrentAverage().average)
+                    .isLessThan(TimeUnit.MILLISECONDS.toNanos(100)));
   }
 }

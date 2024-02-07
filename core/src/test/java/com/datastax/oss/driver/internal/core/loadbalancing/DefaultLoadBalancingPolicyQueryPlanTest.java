@@ -23,7 +23,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -35,14 +34,12 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableSet;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLongArray;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mock;
 
 public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingPolicyQueryPlanTest {
 
-  private static final long T0 = Long.MIN_VALUE;
   private static final long T1 = 100;
   private static final long T2 = 200;
   private static final long T3 = 300;
@@ -194,15 +191,14 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
   }
 
   @Test
-  public void
-      should_reorder_if_moving_average_faster() {
+  public void should_reorder_if_moving_average_faster() {
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
     given(tokenMap.getReplicas(KEYSPACE, ROUTING_KEY))
         .willReturn(ImmutableSet.of(node1, node3, node5));
 
-    for(int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++) {
       dsePolicy.onNodeSuccess(null, 100000000, null, node1, "");
       dsePolicy.onNodeSuccess(null, 90000000, null, node3, "");
     }
@@ -222,17 +218,15 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     then(dsePolicy).should(never()).diceRoll1d4();
   }
 
-
   @Test
-  public void
-  should_not_reorder_if_moving_average_obsolete() throws InterruptedException {
+  public void should_not_reorder_if_moving_average_obsolete() throws InterruptedException {
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
     given(tokenMap.getReplicas(KEYSPACE, ROUTING_KEY))
-            .willReturn(ImmutableSet.of(node1, node3, node5));
+        .willReturn(ImmutableSet.of(node1, node3, node5));
 
-    for(int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++) {
       dsePolicy.onNodeSuccess(null, 100000000, null, node1, "");
       dsePolicy.onNodeSuccess(null, 90000000, null, node3, "");
     }

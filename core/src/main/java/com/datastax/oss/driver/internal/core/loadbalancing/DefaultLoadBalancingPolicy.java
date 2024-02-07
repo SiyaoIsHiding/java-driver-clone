@@ -17,7 +17,6 @@
  */
 package com.datastax.oss.driver.internal.core.loadbalancing;
 
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 import com.datastax.oss.driver.api.core.DriverTimeoutException;
@@ -29,15 +28,11 @@ import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
 import com.datastax.oss.driver.internal.core.loadbalancing.helper.MandatoryLocalDcHelper;
-import com.datastax.oss.driver.internal.core.pool.ChannelPool;
-import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.util.ArrayUtils;
 import com.datastax.oss.driver.internal.core.util.collection.QueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-
-import java.util.BitSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
@@ -47,9 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.concurrent.atomic.AtomicReference;
-
 import net.jcip.annotations.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,8 +61,8 @@ import org.slf4j.LoggerFactory;
  *   }
  * }
  * </pre>
- * <p>
- * See {@code reference.conf} (in the manual or core driver JAR) for more details.
+ *
+ * <p>See {@code reference.conf} (in the manual or core driver JAR) for more details.
  *
  * <p><b>Local datacenter</b>: This implementation requires a local datacenter to be defined,
  * otherwise it will throw an {@link IllegalStateException}. A local datacenter can be supplied
@@ -96,171 +89,167 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy implements RequestTracker {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultLoadBalancingPolicy.class);
+  private static final Logger LOG = LoggerFactory.getLogger(DefaultLoadBalancingPolicy.class);
 
-    private static final long NEWLY_UP_INTERVAL_NANOS = MINUTES.toNanos(1);
-    private final long SCALE = TimeUnit.MILLISECONDS.toNanos(100);
-    private final long THRESHOLD_TO_ACCOUNT = 100;
-    private final long RETRY_PERIOD = TimeUnit.SECONDS.toNanos(10);
+  private static final long NEWLY_UP_INTERVAL_NANOS = MINUTES.toNanos(1);
+  private final long SCALE = TimeUnit.MILLISECONDS.toNanos(100);
+  private final long THRESHOLD_TO_ACCOUNT = 100;
+  private final long RETRY_PERIOD = TimeUnit.SECONDS.toNanos(10);
 
-    protected final Map<Node, Long> upTimes = new ConcurrentHashMap<>();
-    private final boolean avoidSlowReplicas;
+  protected final Map<Node, Long> upTimes = new ConcurrentHashMap<>();
+  private final boolean avoidSlowReplicas;
 
-    protected final ConcurrentMap<Node, NodeLatencyTracker> latencies =
-            new ConcurrentHashMap<Node, NodeLatencyTracker>();
+  protected final ConcurrentMap<Node, NodeLatencyTracker> latencies =
+      new ConcurrentHashMap<Node, NodeLatencyTracker>();
 
-    public DefaultLoadBalancingPolicy(@NonNull DriverContext context, @NonNull String profileName) {
-        super(context, profileName);
-        this.avoidSlowReplicas =
-                profile.getBoolean(DefaultDriverOption.LOAD_BALANCING_POLICY_SLOW_AVOIDANCE, true);
+  public DefaultLoadBalancingPolicy(@NonNull DriverContext context, @NonNull String profileName) {
+    super(context, profileName);
+    this.avoidSlowReplicas =
+        profile.getBoolean(DefaultDriverOption.LOAD_BALANCING_POLICY_SLOW_AVOIDANCE, true);
+  }
+
+  @NonNull
+  @Override
+  public Optional<RequestTracker> getRequestTracker() {
+    if (avoidSlowReplicas) {
+      return Optional.of(this);
+    } else {
+      return Optional.empty();
+    }
+  }
+
+  @NonNull
+  @Override
+  protected Optional<String> discoverLocalDc(@NonNull Map<UUID, Node> nodes) {
+    return new MandatoryLocalDcHelper(context, profile, logPrefix).discoverLocalDc(nodes);
+  }
+
+  @NonNull
+  @Override
+  public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
+    if (!avoidSlowReplicas) {
+      return super.newQueryPlan(request, session);
     }
 
-    @NonNull
-    @Override
-    public Optional<RequestTracker> getRequestTracker() {
-        if (avoidSlowReplicas) {
-            return Optional.of(this);
-        } else {
-            return Optional.empty();
+    // Take a snapshot since the set is concurrent:
+    Object[] currentNodes = getLiveNodes().dc(getLocalDatacenter()).toArray();
+
+    Set<Node> allReplicas = getReplicas(request, session);
+    int replicaCount = 0; // in currentNodes
+
+    if (!allReplicas.isEmpty()) {
+
+      // Move replicas to the beginning of the plan
+      for (int i = 0; i < currentNodes.length; i++) {
+        Node node = (Node) currentNodes[i];
+        if (allReplicas.contains(node)) {
+          ArrayUtils.bubbleUp(currentNodes, i, replicaCount);
+          replicaCount++;
         }
-    }
+      }
 
-    @NonNull
-    @Override
-    protected Optional<String> discoverLocalDc(@NonNull Map<UUID, Node> nodes) {
-        return new MandatoryLocalDcHelper(context, profile, logPrefix).discoverLocalDc(nodes);
-    }
+      if (replicaCount > 1) {
 
-    @NonNull
-    @Override
-    public Queue<Node> newQueryPlan(@Nullable Request request, @Nullable Session session) {
-        if (!avoidSlowReplicas) {
-            return super.newQueryPlan(request, session);
-        }
+        shuffleHead(currentNodes, replicaCount);
 
-        // Take a snapshot since the set is concurrent:
-        Object[] currentNodes = getLiveNodes().dc(getLocalDatacenter()).toArray();
+        if (replicaCount > 2) {
 
-        Set<Node> allReplicas = getReplicas(request, session);
-        int replicaCount = 0; // in currentNodes
+          assert session != null;
 
-        if (!allReplicas.isEmpty()) {
-
-            // Move replicas to the beginning of the plan
-            for (int i = 0; i < currentNodes.length; i++) {
-                Node node = (Node) currentNodes[i];
-                if (allReplicas.contains(node)) {
-                    ArrayUtils.bubbleUp(currentNodes, i, replicaCount);
-                    replicaCount++;
-                }
+          // Test replicas health
+          Node newestUpReplica = null;
+          long mostRecentUpTimeNanos = -1;
+          long now = nanoTime();
+          for (int i = 0; i < replicaCount; i++) {
+            Node node = (Node) currentNodes[i];
+            assert node != null;
+            Long upTimeNanos = upTimes.get(node);
+            if (upTimeNanos != null
+                && now - upTimeNanos - NEWLY_UP_INTERVAL_NANOS < 0
+                && upTimeNanos - mostRecentUpTimeNanos > 0) {
+              newestUpReplica = node;
+              mostRecentUpTimeNanos = upTimeNanos;
             }
+          }
 
-            if (replicaCount > 1) {
+          // When:
+          // - there is a newly UP replica and
+          // - the replica in first or second position is the most recent replica marked as UP and
+          // - dice roll 1d4 != 1
+          if ((newestUpReplica == currentNodes[0] || newestUpReplica == currentNodes[1])
+              && diceRoll1d4() != 1) {
 
-                shuffleHead(currentNodes, replicaCount);
+            // Send it to the back of the replicas
+            ArrayUtils.bubbleDown(
+                currentNodes, newestUpReplica == currentNodes[0] ? 0 : 1, replicaCount - 1);
+          }
 
-                if (replicaCount > 2) {
-
-                    assert session != null;
-
-                    // Test replicas health
-                    Node newestUpReplica = null;
-                    long mostRecentUpTimeNanos = -1;
-                    long now = nanoTime();
-                    for (int i = 0; i < replicaCount; i++) {
-                        Node node = (Node) currentNodes[i];
-                        assert node != null;
-                        Long upTimeNanos = upTimes.get(node);
-                        if (upTimeNanos != null
-                                && now - upTimeNanos - NEWLY_UP_INTERVAL_NANOS < 0
-                                && upTimeNanos - mostRecentUpTimeNanos > 0) {
-                            newestUpReplica = node;
-                            mostRecentUpTimeNanos = upTimeNanos;
-                        }
-                    }
-
-                    // When:
-                    // - there is a newly UP replica and
-                    // - the replica in first or second position is the most recent replica marked as UP and
-                    // - dice roll 1d4 != 1
-                    if ((newestUpReplica == currentNodes[0] || newestUpReplica == currentNodes[1])
-                            && diceRoll1d4() != 1) {
-
-                        // Send it to the back of the replicas
-                        ArrayUtils.bubbleDown(
-                                currentNodes, newestUpReplica == currentNodes[0] ? 0 : 1, replicaCount - 1);
-                    }
-
-                    // Reorder the first two replicas in the shuffled list
-                  // if the first replica's latency is higher than the second replica's latency and
-                  // the first replica's latency is not too old
-                  NodeLatencyTracker tracker1 = latencies.get((Node) currentNodes[0]);
-                  NodeLatencyTracker tracker2 = latencies.get((Node) currentNodes[1]);
-                  if (tracker1 != null && tracker2 != null) {
-                    TimestampedAverage average1 = tracker1.getCurrentAverage();
-                    TimestampedAverage average2 = tracker2.getCurrentAverage();
-                    if (average1 != null
-                        && average2 != null
-                        && average1.average > average2.average
-                        && System.nanoTime() - average1.timestamp  < RETRY_PERIOD) {
-                      ArrayUtils.swap(currentNodes, 0, 1);
-                    }
-                  }
-                }
+          // Reorder the first two replicas in the shuffled list
+          // if the first replica's latency is higher than the second replica's latency and
+          // the first replica's latency is not too old
+          NodeLatencyTracker tracker1 = latencies.get((Node) currentNodes[0]);
+          NodeLatencyTracker tracker2 = latencies.get((Node) currentNodes[1]);
+          if (tracker1 != null && tracker2 != null) {
+            TimestampedAverage average1 = tracker1.getCurrentAverage();
+            TimestampedAverage average2 = tracker2.getCurrentAverage();
+            if (average1 != null
+                && average2 != null
+                && average1.average > average2.average
+                && System.nanoTime() - average1.timestamp < RETRY_PERIOD) {
+              ArrayUtils.swap(currentNodes, 0, 1);
             }
+          }
         }
-
-        LOG.trace("[{}] Prioritizing {} local replicas", logPrefix, replicaCount);
-
-        // Round-robin the remaining nodes
-        ArrayUtils.rotate(
-                currentNodes,
-                replicaCount,
-                currentNodes.length - replicaCount,
-                roundRobinAmount.getAndUpdate(INCREMENT));
-
-        QueryPlan plan = currentNodes.length == 0 ? QueryPlan.EMPTY : new SimpleQueryPlan(currentNodes);
-        return maybeAddDcFailover(request, plan);
-    }
-
-    @Override
-    public void onNodeSuccess(
-            @NonNull Request request,
-            long latencyNanos,
-            @NonNull DriverExecutionProfile executionProfile,
-            @NonNull Node node,
-            @NonNull String logPrefix) {
-      latencies.putIfAbsent(node, new NodeLatencyTracker(SCALE, THRESHOLD_TO_ACCOUNT));
-      latencies.get(node).add(latencyNanos);
-    }
-
-    @Override
-    public void onNodeError(
-            @NonNull Request request,
-            @NonNull Throwable error,
-            long latencyNanos,
-            @NonNull DriverExecutionProfile executionProfile,
-            @NonNull Node node,
-            @NonNull String logPrefix) {
-      latencies.putIfAbsent(node, new NodeLatencyTracker(SCALE, THRESHOLD_TO_ACCOUNT));
-      if (!(error instanceof DriverTimeoutException)) {
-        latencies.get(node).add(latencyNanos);
       }
     }
 
-    /**
-     * Exposed as a protected method so that it can be accessed by tests
-     */
-    protected long nanoTime() {
-        return System.nanoTime();
-    }
+    LOG.trace("[{}] Prioritizing {} local replicas", logPrefix, replicaCount);
 
-    /**
-     * Exposed as a protected method so that it can be accessed by tests
-     */
-    protected int diceRoll1d4() {
-        return ThreadLocalRandom.current().nextInt(4);
+    // Round-robin the remaining nodes
+    ArrayUtils.rotate(
+        currentNodes,
+        replicaCount,
+        currentNodes.length - replicaCount,
+        roundRobinAmount.getAndUpdate(INCREMENT));
+
+    QueryPlan plan = currentNodes.length == 0 ? QueryPlan.EMPTY : new SimpleQueryPlan(currentNodes);
+    return maybeAddDcFailover(request, plan);
+  }
+
+  @Override
+  public void onNodeSuccess(
+      @NonNull Request request,
+      long latencyNanos,
+      @NonNull DriverExecutionProfile executionProfile,
+      @NonNull Node node,
+      @NonNull String logPrefix) {
+    latencies.putIfAbsent(node, new NodeLatencyTracker(SCALE, THRESHOLD_TO_ACCOUNT));
+    latencies.get(node).add(latencyNanos);
+  }
+
+  @Override
+  public void onNodeError(
+      @NonNull Request request,
+      @NonNull Throwable error,
+      long latencyNanos,
+      @NonNull DriverExecutionProfile executionProfile,
+      @NonNull Node node,
+      @NonNull String logPrefix) {
+    latencies.putIfAbsent(node, new NodeLatencyTracker(SCALE, THRESHOLD_TO_ACCOUNT));
+    if (!(error instanceof DriverTimeoutException)) {
+      latencies.get(node).add(latencyNanos);
     }
+  }
+
+  /** Exposed as a protected method so that it can be accessed by tests */
+  protected long nanoTime() {
+    return System.nanoTime();
+  }
+
+  /** Exposed as a protected method so that it can be accessed by tests */
+  protected int diceRoll1d4() {
+    return ThreadLocalRandom.current().nextInt(4);
+  }
 
   protected static class TimestampedAverage {
 
@@ -278,12 +267,12 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   protected static class NodeLatencyTracker {
 
     private final long thresholdToAccount;
-    private final double scale;
+    private final double localScale;
     private final AtomicReference<TimestampedAverage> current =
-            new AtomicReference<TimestampedAverage>();
+        new AtomicReference<TimestampedAverage>();
 
-    NodeLatencyTracker(long scale, long thresholdToAccount) {
-      this.scale = (double) scale; // We keep in double since that's how we'll use it.
+    NodeLatencyTracker(long localScale, long thresholdToAccount) {
+      this.localScale = (double) localScale; // We keep in double since that's how we'll use it.
       this.thresholdToAccount = thresholdToAccount;
     }
 
@@ -296,7 +285,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
     }
 
     private TimestampedAverage computeNextAverage(
-            TimestampedAverage previous, long newLatencyNanos) {
+        TimestampedAverage previous, long newLatencyNanos) {
 
       long currentTimestamp = System.nanoTime();
 
@@ -321,14 +310,14 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       long delay = currentTimestamp - previous.timestamp;
       if (delay <= 0) return null;
 
-      double scaledDelay = ((double) delay) / scale;
+      double scaledDelay = ((double) delay) / localScale;
       // Note: We don't use log1p because it's quite a bit slower and we don't care about the
       // precision (and since we
       // refuse ridiculously big scales, scaledDelay can't be so low that scaledDelay+1 == 1.0 (due
       // to rounding)).
       double prevWeight = Math.log(scaledDelay + 1) / scaledDelay;
       long newAverage =
-              (long) ((1.0 - prevWeight) * newLatencyNanos + prevWeight * previous.average);
+          (long) ((1.0 - prevWeight) * newLatencyNanos + prevWeight * previous.average);
 
       return new TimestampedAverage(currentTimestamp, newAverage, nbMeasure);
     }
