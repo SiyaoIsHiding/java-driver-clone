@@ -92,7 +92,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   private static final Logger LOG = LoggerFactory.getLogger(DefaultLoadBalancingPolicy.class);
 
   private static final long NEWLY_UP_INTERVAL_NANOS = MINUTES.toNanos(1);
-  private final long SCALE = TimeUnit.MILLISECONDS.toNanos(100);
+  //  private final long SCALE = TimeUnit.MILLISECONDS.toNanos(100);
   private final long THRESHOLD_TO_ACCOUNT = 100;
   private final long RETRY_PERIOD = TimeUnit.SECONDS.toNanos(10);
 
@@ -223,7 +223,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       @NonNull DriverExecutionProfile executionProfile,
       @NonNull Node node,
       @NonNull String logPrefix) {
-    latencies.putIfAbsent(node, new NodeLatencyTracker(SCALE, THRESHOLD_TO_ACCOUNT));
+    latencies.putIfAbsent(node, new NodeLatencyTracker(THRESHOLD_TO_ACCOUNT));
     latencies.get(node).add(latencyNanos);
   }
 
@@ -235,7 +235,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       @NonNull DriverExecutionProfile executionProfile,
       @NonNull Node node,
       @NonNull String logPrefix) {
-    latencies.putIfAbsent(node, new NodeLatencyTracker(SCALE, THRESHOLD_TO_ACCOUNT));
+    latencies.putIfAbsent(node, new NodeLatencyTracker(THRESHOLD_TO_ACCOUNT));
     if (!(error instanceof DriverTimeoutException)) {
       latencies.get(node).add(latencyNanos);
     }
@@ -267,12 +267,13 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   protected static class NodeLatencyTracker {
 
     private final long thresholdToAccount;
-    private final double localScale;
+    //    private final double localScale;
     private final AtomicReference<TimestampedAverage> current =
         new AtomicReference<TimestampedAverage>();
 
-    NodeLatencyTracker(long localScale, long thresholdToAccount) {
-      this.localScale = (double) localScale; // We keep in double since that's how we'll use it.
+    NodeLatencyTracker(long thresholdToAccount) {
+      //      this.localScale = (double) localScale; // We keep in double since that's how we'll use
+      // it.
       this.thresholdToAccount = thresholdToAccount;
     }
 
@@ -310,14 +311,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       long delay = currentTimestamp - previous.timestamp;
       if (delay <= 0) return null;
 
-      double scaledDelay = ((double) delay) / localScale;
-      // Note: We don't use log1p because it's quite a bit slower and we don't care about the
-      // precision (and since we
-      // refuse ridiculously big scales, scaledDelay can't be so low that scaledDelay+1 == 1.0 (due
-      // to rounding)).
-      double prevWeight = Math.log(scaledDelay + 1) / scaledDelay;
-      long newAverage =
-          (long) ((1.0 - prevWeight) * newLatencyNanos + prevWeight * previous.average);
+      long newAverage = (previous.average >> 1) + newLatencyNanos;
 
       return new TimestampedAverage(currentTimestamp, newAverage, nbMeasure);
     }
