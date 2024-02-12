@@ -28,6 +28,8 @@ import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
 import com.datastax.oss.driver.internal.core.loadbalancing.helper.MandatoryLocalDcHelper;
+import com.datastax.oss.driver.internal.core.pool.ChannelPool;
+import com.datastax.oss.driver.internal.core.session.DefaultSession;
 import com.datastax.oss.driver.internal.core.util.ArrayUtils;
 import com.datastax.oss.driver.internal.core.util.collection.QueryPlan;
 import com.datastax.oss.driver.internal.core.util.collection.SimpleQueryPlan;
@@ -158,6 +160,7 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
 
           // Test replicas health
           Node newestUpReplica = null;
+
           long mostRecentUpTimeNanos = -1;
           long now = nanoTime();
           for (int i = 0; i < replicaCount; i++) {
@@ -165,10 +168,31 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
             assert node != null;
             Long upTimeNanos = upTimes.get(node);
             if (upTimeNanos != null
-                && now - upTimeNanos - NEWLY_UP_INTERVAL_NANOS < 0
-                && upTimeNanos - mostRecentUpTimeNanos > 0) {
+                    && now - upTimeNanos - NEWLY_UP_INTERVAL_NANOS < 0
+                    && upTimeNanos - mostRecentUpTimeNanos > 0) {
               newestUpReplica = node;
               mostRecentUpTimeNanos = upTimeNanos;
+            }
+          }
+
+          // When:
+          // - there isn't any newly UP replica
+          // - there are 3 replicas in total
+          // bubble down the slowest replica to the end of the replicas
+          // - else if there are more than 3 replicas in total
+          // bubble down the slowest 2 replicas in the first 4 replicas out of the first 2 positions
+          if (newestUpReplica == null) {
+            if (replicaCount == 3) {
+              compareAndSwapSlowReplica(currentNodes, 0, 1);
+              compareAndSwapSlowReplica(currentNodes, 1, 2);
+              compareAndSwapSlowReplica(currentNodes, 0, 1);
+            } else {
+              for (int i = 0; i < 3; i++) {
+                compareAndSwapSlowReplica(currentNodes, i, i + 1);
+              }
+              for (int i = 0; i < 2; i++) {
+                compareAndSwapSlowReplica(currentNodes, i, i + 1);
+              }
             }
           }
 
@@ -176,28 +200,19 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
           // - there is a newly UP replica and
           // - the replica in first or second position is the most recent replica marked as UP and
           // - dice roll 1d4 != 1
-          if ((newestUpReplica == currentNodes[0] || newestUpReplica == currentNodes[1])
-              && diceRoll1d4() != 1) {
+          else if ((newestUpReplica == currentNodes[0] || newestUpReplica == currentNodes[1])
+                  && diceRoll1d4() != 1) {
 
             // Send it to the back of the replicas
             ArrayUtils.bubbleDown(
-                currentNodes, newestUpReplica == currentNodes[0] ? 0 : 1, replicaCount - 1);
+                    currentNodes, newestUpReplica == currentNodes[0] ? 0 : 1, replicaCount - 1);
           }
 
-          // Reorder the first two replicas in the shuffled list
-          // if the first replica's latency is higher than the second replica's latency and
-          // the first replica's latency is not too old
-          NodeLatencyTracker tracker1 = latencies.get((Node) currentNodes[0]);
-          NodeLatencyTracker tracker2 = latencies.get((Node) currentNodes[1]);
-          if (tracker1 != null && tracker2 != null) {
-            TimestampedAverage average1 = tracker1.getCurrentAverage();
-            TimestampedAverage average2 = tracker2.getCurrentAverage();
-            if (average1 != null
-                && average2 != null
-                && average1.average > average2.average
-                && System.nanoTime() - average1.timestamp < RETRY_PERIOD) {
-              ArrayUtils.swap(currentNodes, 0, 1);
-            }
+          // Reorder the first two replicas in the shuffled list based on the number of
+          // in-flight requests
+          if (getInFlight((Node) currentNodes[0], session)
+                  > getInFlight((Node) currentNodes[1], session)) {
+            ArrayUtils.swap(currentNodes, 0, 1);
           }
         }
       }
@@ -317,6 +332,30 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
 
     public TimestampedAverage getCurrentAverage() {
       return current.get();
+    }
+  }
+
+  protected int getInFlight(@NonNull Node node, @NonNull Session session) {
+    // The cast will always succeed because there's no way to replace the internal session impl
+    ChannelPool pool = ((DefaultSession) session).getPools().get(node);
+    // Note: getInFlight() includes orphaned ids, which is what we want as we need to account
+    // for requests that were cancelled or timed out (since the node is likely to still be
+    // processing them).
+    return (pool == null) ? 0 : pool.getInFlight();
+  }
+
+  private void compareAndSwapSlowReplica(Object[] currentNodes, int i, int j) {
+    NodeLatencyTracker tracker1 = latencies.get((Node) currentNodes[i]);
+    NodeLatencyTracker tracker2 = latencies.get((Node) currentNodes[j]);
+    if (tracker1 != null && tracker2 != null) {
+      TimestampedAverage average1 = tracker1.getCurrentAverage();
+      TimestampedAverage average2 = tracker2.getCurrentAverage();
+      if (average1 != null
+              && average2 != null
+              && average1.average > average2.average
+              && System.nanoTime() - average1.timestamp < RETRY_PERIOD) {
+        ArrayUtils.swap(currentNodes, i, j);
+      }
     }
   }
 }

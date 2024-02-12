@@ -191,7 +191,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
   }
 
   @Test
-  public void should_reorder_if_moving_average_faster() {
+  public void should_put_slowest_node_at_end_when_3_local_replicas() {
     // Given
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
@@ -201,6 +201,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     for (int i = 0; i < 100; i++) {
       dsePolicy.onNodeSuccess(null, 100000000, null, node1, "");
       dsePolicy.onNodeSuccess(null, 90000000, null, node3, "");
+      dsePolicy.onNodeSuccess(null, 90000000, null, node5, "");
     }
 
     // When
@@ -210,8 +211,8 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     // Then
     // nodes 1, 3 and 5 always first, round-robin on the rest
     // node 3 faster -> swap
-    assertThat(plan1).containsExactly(node3, node1, node5, node2, node4);
-    assertThat(plan2).containsExactly(node3, node1, node5, node4, node2);
+    assertThat(plan1).containsExactly(node3, node5, node1, node2, node4);
+    assertThat(plan2).containsExactly(node3, node5, node1, node4, node2);
 
     then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
     then(dsePolicy).should(times(2)).nanoTime();
@@ -247,6 +248,35 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     then(dsePolicy).should(never()).diceRoll1d4();
   }
 
+  @Test
+  public void should_put_slowest_replicas_at_end_when_4_replicas() throws InterruptedException {
+    // Given
+    given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
+    given(request.getRoutingKey()).willReturn(ROUTING_KEY);
+    given(tokenMap.getReplicas(KEYSPACE, ROUTING_KEY))
+            .willReturn(ImmutableSet.of(node1, node3, node4, node5));
+
+    for (int i = 0; i < 100; i++) {
+      dsePolicy.onNodeSuccess(null, 100000000, null, node1, "");
+      dsePolicy.onNodeSuccess(null, 95000000, null, node3, "");
+      dsePolicy.onNodeSuccess(null, 90000000, null, node4, "");
+      dsePolicy.onNodeSuccess(null, 90000000, null, node5, "");
+    }
+
+    // When
+    Queue<Node> plan1 = dsePolicy.newQueryPlan(request, session);
+    Queue<Node> plan2 = dsePolicy.newQueryPlan(request, session);
+
+    // Then
+    // nodes 1, 3 and 5 always first, round-robin on the rest
+    // node 3 faster -> swap
+    assertThat(plan1).containsExactly(node4, node5, node3, node1, node2);
+    assertThat(plan2).containsExactly(node4, node5, node3, node1, node2);
+
+    then(dsePolicy).should(times(2)).shuffleHead(any(), anyInt());
+    then(dsePolicy).should(times(2)).nanoTime();
+    then(dsePolicy).should(never()).diceRoll1d4();
+  }
   @Test
   public void should_prioritize_and_shuffle_3_or_more_replicas_when_last_unhealthy() {
     // Given
