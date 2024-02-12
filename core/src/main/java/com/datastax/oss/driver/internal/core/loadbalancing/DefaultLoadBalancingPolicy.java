@@ -236,9 +236,8 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       @NonNull Node node,
       @NonNull String logPrefix) {
     latencies.putIfAbsent(node, new NodeLatencyTracker(THRESHOLD_TO_ACCOUNT));
-    if (!(error instanceof DriverTimeoutException)) {
-      latencies.get(node).add(latencyNanos);
-    }
+    // even if it's DriverTimeoutException, we still want to put the timeout latency (5s) in it
+    latencies.get(node).add(latencyNanos);
   }
 
   /** Exposed as a protected method so that it can be accessed by tests */
