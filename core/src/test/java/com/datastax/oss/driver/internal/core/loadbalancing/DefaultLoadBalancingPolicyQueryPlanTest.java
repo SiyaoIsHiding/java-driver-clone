@@ -254,7 +254,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     given(request.getRoutingKeyspace()).willReturn(KEYSPACE);
     given(request.getRoutingKey()).willReturn(ROUTING_KEY);
     given(tokenMap.getReplicas(KEYSPACE, ROUTING_KEY))
-            .willReturn(ImmutableSet.of(node1, node3, node4, node5));
+        .willReturn(ImmutableSet.of(node1, node3, node4, node5));
 
     for (int i = 0; i < 100; i++) {
       dsePolicy.onNodeSuccess(null, 100000000, null, node1, "");
@@ -277,6 +277,7 @@ public class DefaultLoadBalancingPolicyQueryPlanTest extends BasicLoadBalancingP
     then(dsePolicy).should(times(2)).nanoTime();
     then(dsePolicy).should(never()).diceRoll1d4();
   }
+
   @Test
   public void should_prioritize_and_shuffle_3_or_more_replicas_when_last_unhealthy() {
     // Given

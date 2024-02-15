@@ -19,7 +19,6 @@ package com.datastax.oss.driver.internal.core.loadbalancing;
 
 import static java.util.concurrent.TimeUnit.MINUTES;
 
-import com.datastax.oss.driver.api.core.DriverTimeoutException;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
@@ -168,8 +167,8 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
             assert node != null;
             Long upTimeNanos = upTimes.get(node);
             if (upTimeNanos != null
-                    && now - upTimeNanos - NEWLY_UP_INTERVAL_NANOS < 0
-                    && upTimeNanos - mostRecentUpTimeNanos > 0) {
+                && now - upTimeNanos - NEWLY_UP_INTERVAL_NANOS < 0
+                && upTimeNanos - mostRecentUpTimeNanos > 0) {
               newestUpReplica = node;
               mostRecentUpTimeNanos = upTimeNanos;
             }
@@ -201,17 +200,17 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
           // - the replica in first or second position is the most recent replica marked as UP and
           // - dice roll 1d4 != 1
           else if ((newestUpReplica == currentNodes[0] || newestUpReplica == currentNodes[1])
-                  && diceRoll1d4() != 1) {
+              && diceRoll1d4() != 1) {
 
             // Send it to the back of the replicas
             ArrayUtils.bubbleDown(
-                    currentNodes, newestUpReplica == currentNodes[0] ? 0 : 1, replicaCount - 1);
+                currentNodes, newestUpReplica == currentNodes[0] ? 0 : 1, replicaCount - 1);
           }
 
           // Reorder the first two replicas in the shuffled list based on the number of
           // in-flight requests
           if (getInFlight((Node) currentNodes[0], session)
-                  > getInFlight((Node) currentNodes[1], session)) {
+              > getInFlight((Node) currentNodes[1], session)) {
             ArrayUtils.swap(currentNodes, 0, 1);
           }
         }
@@ -281,13 +280,10 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
   protected static class NodeLatencyTracker {
 
     private final long thresholdToAccount;
-    //    private final double localScale;
     private final AtomicReference<TimestampedAverage> current =
         new AtomicReference<TimestampedAverage>();
 
     NodeLatencyTracker(long thresholdToAccount) {
-      //      this.localScale = (double) localScale; // We keep in double since that's how we'll use
-      // it.
       this.thresholdToAccount = thresholdToAccount;
     }
 
@@ -351,9 +347,9 @@ public class DefaultLoadBalancingPolicy extends BasicLoadBalancingPolicy impleme
       TimestampedAverage average1 = tracker1.getCurrentAverage();
       TimestampedAverage average2 = tracker2.getCurrentAverage();
       if (average1 != null
-              && average2 != null
-              && average1.average > average2.average
-              && System.nanoTime() - average1.timestamp < RETRY_PERIOD) {
+          && average2 != null
+          && average1.average > average2.average
+          && System.nanoTime() - average1.timestamp < RETRY_PERIOD) {
         ArrayUtils.swap(currentNodes, i, j);
       }
     }
