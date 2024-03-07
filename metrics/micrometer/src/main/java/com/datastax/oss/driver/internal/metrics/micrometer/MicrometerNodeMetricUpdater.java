@@ -49,10 +49,11 @@ public class MicrometerNodeMetricUpdater extends MicrometerMetricUpdater<NodeMet
 
     DriverExecutionProfile profile = context.getConfig().getDefaultProfile();
 
-    initializeGauge(DefaultNodeMetric.OPEN_CONNECTIONS, profile, node::getOpenConnections);
-    initializeGauge(DefaultNodeMetric.AVAILABLE_STREAMS, profile, () -> availableStreamIds(node));
-    initializeGauge(DefaultNodeMetric.IN_FLIGHT, profile, () -> inFlightRequests(node));
-    initializeGauge(DefaultNodeMetric.ORPHANED_STREAMS, profile, () -> orphanedStreamIds(node));
+    initializeGaugeWeak(DefaultNodeMetric.OPEN_CONNECTIONS, profile, node::getOpenConnections);
+    initializeGaugeWeak(
+        DefaultNodeMetric.AVAILABLE_STREAMS, profile, () -> availableStreamIds(node));
+    initializeGaugeWeak(DefaultNodeMetric.IN_FLIGHT, profile, () -> inFlightRequests(node));
+    initializeGaugeWeak(DefaultNodeMetric.ORPHANED_STREAMS, profile, () -> orphanedStreamIds(node));
 
     initializeCounter(DefaultNodeMetric.UNSENT_REQUESTS, profile);
     initializeCounter(DefaultNodeMetric.ABORTED_REQUESTS, profile);
