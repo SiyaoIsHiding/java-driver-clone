@@ -100,19 +100,6 @@ public abstract class MicrometerMetricUpdater<MetricT> extends AbstractMetricUpd
           m -> {
             MetricId id = getMetricId(m);
             Iterable<Tag> tags = MicrometerTags.toMicrometerTags(id.getTags());
-            return Gauge.builder(id.getName(), supplier).tags(tags).register(registry);
-          });
-    }
-  }
-
-  protected void initializeGaugeWeak(
-      MetricT metric, DriverExecutionProfile profile, Supplier<Number> supplier) {
-    if (isEnabled(metric, profile.getName())) {
-      metrics.computeIfAbsent(
-          metric,
-          m -> {
-            MetricId id = getMetricId(m);
-            Iterable<Tag> tags = MicrometerTags.toMicrometerTags(id.getTags());
             return Gauge.builder(id.getName(), supplier)
                 .strongReference(false)
                 .tags(tags)
