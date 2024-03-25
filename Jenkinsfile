@@ -294,7 +294,7 @@ pipeline {
                           <td>Apache Cassandra&reg; v4.x (<b>CURRENTLY UNDER DEVELOPMENT</b>)</td>
                         </tr>
                         <tr>
-                          <td><strong>4.0</strong></td>
+                          <td><strong>4.1</strong></td>
                           <td>Apache Cassandra&reg; v4.1 </td>
                         </tr>
                         <tr>
@@ -575,6 +575,7 @@ pipeline {
                    '3.0',       // Previous Apache CassandraⓇ
                    '3.11',      // Current Apache CassandraⓇ
                    '4.0',       // Development Apache CassandraⓇ
+                    '4.1',
                    'dse-4.8.16',   // Previous EOSL DataStax Enterprise
                    'dse-5.0.15',   // Last EOSL DataStax Enterprise
                    'dse-5.1.35',   // Legacy DataStax Enterprise
