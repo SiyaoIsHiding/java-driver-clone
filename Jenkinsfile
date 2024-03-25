@@ -233,6 +233,7 @@ pipeline {
     choice(
       name: 'ADHOC_BUILD_TYPE',
       choices: ['BUILD', 'BUILD-AND-EXECUTE-TESTS'],
+            defaultValue: 'BUILD',
       description: '''<p>Perform a adhoc build operation</p>
                       <table style="width:100%">
                         <col width="25%">
@@ -265,6 +266,7 @@ pipeline {
                 'dse-6.7.17',   // Previous DataStax Enterprise
                 'dse-6.8.30',   // Current DataStax Enterprise
                 'ALL'],
+            defaultValue: '3.11',
       description: '''Apache Cassandra&reg; and DataStax Enterprise server version to use for adhoc <b>BUILD-AND-EXECUTE-TESTS</b> builds
                       <table style="width:100%">
                         <col width="15%">
@@ -332,6 +334,7 @@ pipeline {
                 'openjdk@1.13',  // OpenJDK version 13
                 'openjdk@1.14',  // OpenJDK version 14
                 'openjdk@1.17'], // OpenJDK version 17
+            defaultValue: '1.8',
       description: '''JDK version to use for <b>TESTING</b> when running adhoc <b>BUILD-AND-EXECUTE-TESTS</b> builds. <i>All builds will use JDK8 for building the driver</i>
                       <table style="width:100%">
                         <col width="15%">
