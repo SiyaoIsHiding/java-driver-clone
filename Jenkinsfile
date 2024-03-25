@@ -571,17 +571,13 @@ pipeline {
         axes {
           axis {
             name 'SERVER_VERSION'
-            values '2.1',       // Legacy Apache CassandraⓇ
-                   '3.0',       // Previous Apache CassandraⓇ
-                   '3.11',      // Current Apache CassandraⓇ
-                   '4.0',       // Development Apache CassandraⓇ
-                    '4.1',
-                   'dse-4.8.16',   // Previous EOSL DataStax Enterprise
-                   'dse-5.0.15',   // Last EOSL DataStax Enterprise
-                   'dse-5.1.35',   // Legacy DataStax Enterprise
-                   'dse-6.0.18',   // Previous DataStax Enterprise
-                   'dse-6.7.17',   // Previous DataStax Enterprise
-                   'dse-6.8.30'    // Current DataStax Enterprise
+            values "${SERVER_VERSIONS}"
+          }
+          axis {
+            name 'JABBA_VERSION'
+            values '1.8',           // jdk8
+                    'openjdk@1.11',  // jdk11
+                    'openjdk@1.17'   // jdk17
           }
         }
         when {
