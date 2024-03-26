@@ -19,6 +19,9 @@
  */
 
 def initializeEnvironment() {
+  sh label: 'Print Env Var',script: '''#!/bin/bash -le
+  printenv | sort
+  '''
   env.DRIVER_DISPLAY_NAME = 'CassandraⓇ Java Driver'
   env.DRIVER_METRIC_TYPE = 'oss'
   if (env.GIT_URL.contains('riptano/java-driver')) {
