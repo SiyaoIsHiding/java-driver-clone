@@ -576,12 +576,6 @@ pipeline {
                     'openjdk@1.17'   // jdk17
           }
         }
-        when {
-          beforeAgent true
-          allOf {
-            expression { return env.SERVER_VERSIONS.split(' ').any { it =~ /(ALL|${env.SERVER_VERSION})/ } }
-          }
-        }
         agent {
           label "${env.OS_VERSION}"
         }
