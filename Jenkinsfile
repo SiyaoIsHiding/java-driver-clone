@@ -570,10 +570,6 @@ pipeline {
       matrix {
         axes {
           axis {
-            name 'SERVER_VERSION'
-            values "${SERVER_VERSIONS}"
-          }
-          axis {
             name 'JABBA_VERSION'
             values '1.8',           // jdk8
                     'openjdk@1.11',  // jdk11
