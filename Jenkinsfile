@@ -107,6 +107,9 @@ ENVIRONMENT_EOF
 }
 
 def buildDriver(jabbaVersion) {
+  sh label: 'Print Env Var',script: '''#!/bin/bash -le
+  printenv | sort
+  '''
   withEnv(["BUILD_JABBA_VERSION=${jabbaVersion}"]) {
     sh label: 'Build driver', script: '''#!/bin/bash -le
       . ${JABBA_SHELL}
@@ -115,9 +118,15 @@ def buildDriver(jabbaVersion) {
       mvn -B -V install -DskipTests -Dmaven.javadoc.skip=true
     '''
   }
+  sh label: 'Print Env Var',script: '''#!/bin/bash -le
+  printenv | sort
+  '''
 }
 
 def executeTests() {
+  sh label: 'Print Env Var',script: '''#!/bin/bash -le
+  printenv | sort
+  '''
   sh label: 'Execute tests', script: '''#!/bin/bash -le
     # Load CCM environment variables
     set -o allexport
