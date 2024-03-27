@@ -444,10 +444,11 @@ pipeline {
     ISOLATED_ITS_ARGUMENT = "-DskipIsolatedITs=${params.SKIP_ISOLATED_ITS}"
     PARALLELIZABLE_ITS_ARGUMENT = "-DskipParallelizableITs=${params.SKIP_PARALLELIZABLE_ITS}"
     INTEGRATION_TESTS_FILTER = "${params.INTEGRATION_TESTS_FILTER}"
+    SERVER_VERSION= "${params.ADHOC_BUILD_AND_EXECUTE_TESTS_SERVER_VERSION}"
   }
 
   stages {
-    stage ('Per-Commit') {
+    stage ('Build-and-Test') {
       options {
         timeout(time: 2, unit: 'HOURS')
       }
@@ -464,12 +465,6 @@ pipeline {
 
       matrix {
         axes {
-          axis {
-            name 'SERVER_VERSION'
-            values '3.11',     // Latest stable Apache CassandraⓇ
-                   '4.0',      // Development Apache CassandraⓇ
-                   'dse-6.8.30' // Current DataStax Enterprise
-          }
           axis {
             name 'JABBA_VERSION'
             values '1.8',           // jdk8
@@ -525,114 +520,6 @@ pipeline {
           stage('Execute-Code-Coverage') {
             // Ensure the code coverage is run only once per-commit
             when { environment name: 'SERVER_VERSION', value: '4.0' }
-            steps {
-              executeCodeCoverage()
-            }
-          }
-        }
-      }
-      post {
-        aborted {
-          notifySlack('aborted')
-        }
-        success {
-          notifySlack('completed')
-        }
-        unstable {
-          notifySlack('unstable')
-        }
-        failure {
-          notifySlack('FAILED')
-        }
-      }
-    }
-
-    stage('Adhoc-And-Scheduled-Testing') {
-      when {
-        beforeAgent true
-        allOf {
-          expression { (params.ADHOC_BUILD_TYPE == 'BUILD' && params.CI_SCHEDULE != 'DO-NOT-CHANGE-THIS-SELECTION') ||
-                       params.ADHOC_BUILD_TYPE == 'BUILD-AND-EXECUTE-TESTS' }
-          not { buildingTag() }
-          anyOf {
-            expression { params.ADHOC_BUILD_TYPE == 'BUILD-AND-EXECUTE-TESTS' }
-            allOf {
-              expression { params.ADHOC_BUILD_TYPE == 'BUILD' }
-              expression { params.CI_SCHEDULE != 'DO-NOT-CHANGE-THIS-SELECTION' }
-              expression { params.CI_SCHEDULE_SERVER_VERSIONS != 'DO-NOT-CHANGE-THIS-SELECTION' }
-            }
-          }
-        }
-      }
-
-      environment {
-        SERVER_VERSION = "${params.ADHOC_BUILD_AND_EXECUTE_TESTS_SERVER_VERSION}"
-        JABBA_VERSION = "${params.CI_SCHEDULE_JABBA_VERSION == 'DO-NOT-CHANGE-THIS-SELECTION' ? params.ADHOC_BUILD_AND_EXECUTE_TESTS_JABBA_VERSION : params.CI_SCHEDULE_JABBA_VERSION}"
-      }
-
-      matrix {
-        axes {
-          axis {
-            name 'JABBA_VERSION'
-            values '1.8',           // jdk8
-                    'openjdk@1.11',  // jdk11
-                    'openjdk@1.17'   // jdk17
-          }
-        }
-        agent {
-          label "${env.OS_VERSION}"
-        }
-
-        stages {
-          stage('Initialize-Environment') {
-            steps {
-              initializeEnvironment()
-              script {
-                if (env.BUILD_STATED_SLACK_NOTIFIED != 'true') {
-                  notifySlack()
-                }
-              }
-            }
-          }
-          stage('Describe-Build') {
-            steps {
-              describeAdhocAndScheduledTestingStage()
-            }
-          }
-          stage('Build-Driver') {
-            steps {
-              // Jabba default should be a JDK8 for now
-              buildDriver('default')
-            }
-          }
-          stage('Execute-Tests') {
-            steps {
-              catchError {
-                // Use the matrix JDK for testing
-                executeTests()
-              }
-            }
-            post {
-              always {
-                /*
-                 * Empty results are possible
-                 *
-                 *  - Build failures during mvn verify may exist so report may not be available
-                 *  - With boolean parameters to skip tests a failsafe report may not be available
-                 */
-                junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
-                junit testResults: '**/target/failsafe-reports/TEST-*.xml', allowEmptyResults: true
-              }
-            }
-          }
-          stage('Execute-Code-Coverage') {
-            // Ensure the code coverage is run only once per-commit
-            when {
-              allOf {
-                environment name: 'SERVER_VERSION', value: '4.0'
-                environment name: 'JABBA_VERSION', value: '1.8'
-              }
-            }
             steps {
               executeCodeCoverage()
             }
