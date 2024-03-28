@@ -74,6 +74,8 @@ def initializeEnvironment() {
     . ${JABBA_SHELL}
     echo "JABBA_VERSION=${JABBA_VERSION}"
     jabba which ${JABBA_VERSION}
+    echo "DRIVER_TEST_JAVA_HOME=${DRIVER_TEST_JAVA_HOME}"
+    echo "DRIVER_TEST_JAVA_VERSION=${DRIVER_TEST_JAVA_VERSION}"
     '''
 
   sh label: 'Download Apache CassandraⓇ or DataStax Enterprise',script: '''#!/bin/bash -le
