@@ -154,6 +154,8 @@ def executeTests() {
     fi
     printenv | sort
 
+    # print the following mvn command
+    echo "mvn -B -V ${INTEGRATION_TESTS_FILTER_ARGUMENT} -T 1 verify -Ptest-jdk-${DRIVER_TEST_JAVA_VERSION} -DtestJavaHome=${DRIVER_TEST_JAVA_HOME} -DfailIfNoTests=false -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=${SKIP_JAVADOCS} -Dccm.version=${CCM_CASSANDRA_VERSION} -Dccm.dse=${CCM_IS_DSE} -Dproxy.path=${HOME}/proxy ${SERIAL_ITS_ARGUMENT} ${ISOLATED_ITS_ARGUMENT} ${PARALLELIZABLE_ITS_ARGUMENT}"
     mvn -B -V ${INTEGRATION_TESTS_FILTER_ARGUMENT} -T 1 verify \
       -Ptest-jdk-${DRIVER_TEST_JAVA_VERSION} \
       -DtestJavaHome=${DRIVER_TEST_JAVA_HOME} \
