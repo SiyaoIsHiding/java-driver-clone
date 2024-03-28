@@ -70,6 +70,12 @@ def initializeEnvironment() {
   env.TEST_JAVA_VERSION = sh(label: 'Get TEST_JAVA_VERSION',script: '''#!/bin/bash -le
     echo "${JABBA_VERSION##*.}"''', returnStdout: true).trim()
 
+  sh label: 'Print jabba output', script: '''#!/bin/bash -le
+    . ${JABBA_SHELL}
+    echo "JABBA_VERSION=${JABBA_VERSION}"
+    jabba which ${JABBA_VERSION}
+    '''
+
   sh label: 'Download Apache CassandraⓇ or DataStax Enterprise',script: '''#!/bin/bash -le
     . ${JABBA_SHELL}
     jabba use 1.8
