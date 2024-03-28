@@ -160,8 +160,8 @@ def executeTests() {
 
     # print the following mvn command
     mvn -B -V ${INTEGRATION_TESTS_FILTER_ARGUMENT} -T 1 verify \
-      -Ptest-jdk-\${GLOBAL_MAP_VERSION[env.JABBA_VERSION]} \
-      -DtestJavaHome=\${GLOBAL_MAP_HOME[env.JABBA_VERSION]} \
+      -Ptest-jdk-${GLOBAL_MAP_VERSION[${JABBA_VERSION}]} \
+      -DtestJavaHome=${GLOBAL_MAP_HOME[${JABBA_VERSION}]} \
       -DfailIfNoTests=false \
       -Dmaven.test.failure.ignore=true \
       -Dmaven.javadoc.skip=${SKIP_JAVADOCS} \
