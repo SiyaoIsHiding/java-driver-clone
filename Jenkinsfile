@@ -18,8 +18,14 @@
  * under the License.
  */
 
-GLOBAL_MAP_HOME = [:]
-GLOBAL_MAP_VERSION = [:]
+def GLOBAL_MAP_HOME = [:]
+def GLOBAL_MAP_VERSION = [:]
+String getVersionString(def version) {
+  return GLOBAL_MAP_VERSION[version.toString()]
+}
+String getJavaHomeString(def version) {
+  return GLOBAL_MAP_HOME[version.toString()]
+}
 def initializeEnvironment() {
   sh label: 'Print Env Var',script: '''#!/bin/bash -le
   printenv | sort
@@ -160,8 +166,8 @@ def executeTests() {
 
     # print the following mvn command
     mvn -B -V ${INTEGRATION_TESTS_FILTER_ARGUMENT} -T 1 verify \
-      -Ptest-jdk-${GLOBAL_MAP_VERSION[JABBA_VERSION.toString()]} \
-      -DtestJavaHome=${GLOBAL_MAP_HOME[JABBA_VERSION.toString()]} \
+      -Ptest-jdk-${getVersionString(JABBA_VERSION)} \
+      -DtestJavaHome=${getJavaHomeString(JABBA_VERSION)} \
       -DfailIfNoTests=false \
       -Dmaven.test.failure.ignore=true \
       -Dmaven.javadoc.skip=${SKIP_JAVADOCS} \
