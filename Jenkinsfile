@@ -66,9 +66,9 @@ def initializeEnvironment() {
 
   env.DRIVER_TEST_JAVA_HOME = sh(label: 'Get TEST_JAVA_HOME',script: '''#!/bin/bash -le
     . ${JABBA_SHELL}
-    jabba which ${JABBA_VERSION}''', returnStdout: true).trim()
+    jabba which ${JABBA_VERSION}''', returnStdout: true).trim().toString()
   env.DRIVER_TEST_JAVA_VERSION = sh(label: 'Get TEST_JAVA_VERSION',script: '''#!/bin/bash -le
-    echo "${JABBA_VERSION##*.}"''', returnStdout: true).trim()
+    echo "${JABBA_VERSION##*.}"''', returnStdout: true).trim().toString()
 
   sh label: 'Print jabba output', script: '''#!/bin/bash -le
     . ${JABBA_SHELL}
