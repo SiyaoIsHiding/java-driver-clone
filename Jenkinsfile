@@ -74,8 +74,8 @@ def initializeEnvironment() {
     . ${JABBA_SHELL}
     echo "JABBA_VERSION=${JABBA_VERSION}"
     jabba which ${JABBA_VERSION}
-    echo "DRIVER_TEST_JAVA_HOME=${DRIVER_TEST_JAVA_HOME}"
-    echo "DRIVER_TEST_JAVA_VERSION=${DRIVER_TEST_JAVA_VERSION}"
+    echo "DRIVER_TEST_JAVA_HOME=\${DRIVER_TEST_JAVA_HOME}"
+    echo "DRIVER_TEST_JAVA_VERSION=\${DRIVER_TEST_JAVA_VERSION}"
     '''
 
   sh label: 'Download Apache CassandraⓇ or DataStax Enterprise',script: '''#!/bin/bash -le
@@ -95,8 +95,6 @@ DSE_VERSION=${DSE_FIXED_VERSION}
 CCM_IS_DSE=true
 CCM_BRANCH=${DSE_FIXED_VERSION}
 DSE_BRANCH=${DSE_FIXED_VERSION}
-DRIVER_TEST_JAVA_HOME=${DRIVER_TEST_JAVA_HOME}
-DRIVER_TEST_JAVA_VERSION=${DRIVER_TEST_JAVA_VERSION}
 ENVIRONMENT_EOF
       '''
   }
@@ -159,10 +157,9 @@ def executeTests() {
     printenv | sort
 
     # print the following mvn command
-    echo "mvn -B -V ${INTEGRATION_TESTS_FILTER_ARGUMENT} -T 1 verify -Ptest-jdk-${DRIVER_TEST_JAVA_VERSION} -DtestJavaHome=${DRIVER_TEST_JAVA_HOME} -DfailIfNoTests=false -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=${SKIP_JAVADOCS} -Dccm.version=${CCM_CASSANDRA_VERSION} -Dccm.dse=${CCM_IS_DSE} -Dproxy.path=${HOME}/proxy ${SERIAL_ITS_ARGUMENT} ${ISOLATED_ITS_ARGUMENT} ${PARALLELIZABLE_ITS_ARGUMENT}"
     mvn -B -V ${INTEGRATION_TESTS_FILTER_ARGUMENT} -T 1 verify \
-      -Ptest-jdk-${DRIVER_TEST_JAVA_VERSION} \
-      -DtestJavaHome=${DRIVER_TEST_JAVA_HOME} \
+      -Ptest-jdk-\${DRIVER_TEST_JAVA_VERSION} \
+      -DtestJavaHome=\${DRIVER_TEST_JAVA_HOME} \
       -DfailIfNoTests=false \
       -Dmaven.test.failure.ignore=true \
       -Dmaven.javadoc.skip=${SKIP_JAVADOCS} \
