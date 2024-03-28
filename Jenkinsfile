@@ -135,7 +135,7 @@ def executeTests() {
   sh label: 'Print Env Var',script: '''#!/bin/bash -le
   printenv | sort
   '''
-  sh label: 'Execute tests', script: '''#!/bin/bash -le
+  sh label: 'Execute tests', script: '''#!/bin/bash -lex
     # Load CCM environment variables
     set -o allexport
     . ${HOME}/environment.txt
