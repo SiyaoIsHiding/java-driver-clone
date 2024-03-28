@@ -18,8 +18,8 @@
  * under the License.
  */
 
-def GLOBAL_MAP_HOME = [:]
-def GLOBAL_MAP_VERSION = [:]
+GLOBAL_MAP_HOME = [:]
+GLOBAL_MAP_VERSION = [:]
 String getVersionString(def version) {
   return GLOBAL_MAP_VERSION[version.toString()]
 }
