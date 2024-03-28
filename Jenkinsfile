@@ -66,11 +66,10 @@ def initializeEnvironment() {
     . ${JABBA_SHELL}
     jabba which 1.8''', returnStdout: true).trim()
 
-  env.LOCAL_JABBA_VERSION = "$JABBA_VERSION".toString()
-  GLOBAL_MAP_HOME[env.LOCAL_JABBA_VERSION] = sh(label: 'Get TEST_JAVA_HOME',script: '''#!/bin/bash -le
+  GLOBAL_MAP_HOME[env.JABBA_VERSION] = sh(label: 'Get TEST_JAVA_HOME',script: '''#!/bin/bash -le
     . ${JABBA_SHELL}
     jabba which ${JABBA_VERSION}''', returnStdout: true).trim().toString()
-  GLOBAL_MAP_VERSION[env.LOCAL_JABBA_VERSION] = sh(label: 'Get TEST_JAVA_VERSION',script: '''#!/bin/bash -le
+  GLOBAL_MAP_VERSION[env.JABBA_VERSION] = sh(label: 'Get TEST_JAVA_VERSION',script: '''#!/bin/bash -le
     echo "${JABBA_VERSION##*.}"''', returnStdout: true).trim().toString()
 
   sh label: 'Print jabba output', script: '''#!/bin/bash -le
@@ -161,8 +160,8 @@ def executeTests() {
 
     # print the following mvn command
     mvn -B -V ${INTEGRATION_TESTS_FILTER_ARGUMENT} -T 1 verify \
-      -Ptest-jdk-\${GLOBAL_MAP_HOME[env.LOCAL_JABBA_VERSION]} \
-      -DtestJavaHome=\${GLOBAL_MAP_HOME[env.LOCAL_JABBA_HOME]} \
+      -Ptest-jdk-\${GLOBAL_MAP_VERSION[env.JABBA_VERSION]} \
+      -DtestJavaHome=\${GLOBAL_MAP_HOME[env.JABBA_VERSION]} \
       -DfailIfNoTests=false \
       -Dmaven.test.failure.ignore=true \
       -Dmaven.javadoc.skip=${SKIP_JAVADOCS} \
