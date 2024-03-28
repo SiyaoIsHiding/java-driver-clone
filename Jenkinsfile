@@ -61,12 +61,6 @@ def initializeEnvironment() {
     . ${JABBA_SHELL}
     jabba which 1.8''', returnStdout: true).trim()
 
-  env.TEST_JAVA_HOME = sh(label: 'Get TEST_JAVA_HOME',script: '''#!/bin/bash -le
-    . ${JABBA_SHELL}
-    jabba which ${JABBA_VERSION}''', returnStdout: true).trim()
-  env.TEST_JAVA_VERSION = sh(label: 'Get TEST_JAVA_VERSION',script: '''#!/bin/bash -le
-    echo "${JABBA_VERSION##*.}"''', returnStdout: true).trim()
-
   sh label: 'Download Apache CassandraⓇ or DataStax Enterprise',script: '''#!/bin/bash -le
     . ${JABBA_SHELL}
     jabba use 1.8
@@ -115,6 +109,15 @@ def buildDriver(jabbaVersion) {
 }
 
 def executeTests() {
+  // we have to use "def" here because we want these two vars
+  // to be local so that they won't interfere with each other
+  // in the multiple jobs running in parallel in the matrix
+  def TEST_JAVA_HOME = sh(label: 'Get TEST_JAVA_HOME', script: '''#!/bin/bash -le
+    . ${JABBA_SHELL}
+    jabba which ${JABBA_VERSION}''', returnStdout: true).trim()
+  def TEST_JAVA_VERSION = sh(label: 'Get TEST_JAVA_VERSION', script: '''#!/bin/bash -le
+    echo "${JABBA_VERSION##*.}"''', returnStdout: true).trim()
+
   sh label: 'Execute tests', script: '''#!/bin/bash -le
     # Load CCM environment variables
     set -o allexport
@@ -136,9 +139,10 @@ def executeTests() {
     fi
     printenv | sort
 
-    mvn -B -V ${INTEGRATION_TESTS_FILTER_ARGUMENT} -T 1 verify \
-      -Ptest-jdk-${TEST_JAVA_VERSION} \
-      -DtestJavaHome=${TEST_JAVA_HOME} \
+    mvn -B -V ${INTEGRATION_TESTS_FILTER_ARGUMENT} -T 1 verify  '''
+  +"-Ptest-jdk-${TEST_JAVA_VERSION} "  // we need to concatenate like this
+  +"-DtestJavaHome=${TEST_JAVA_HOME}  " // because they are groovy vars instead of env vars
+  +'''
       -DfailIfNoTests=false \
       -Dmaven.test.failure.ignore=true \
       -Dmaven.javadoc.skip=${SKIP_JAVADOCS} \
