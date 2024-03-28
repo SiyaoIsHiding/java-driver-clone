@@ -66,7 +66,7 @@ def initializeEnvironment() {
     . ${JABBA_SHELL}
     jabba which 1.8''', returnStdout: true).trim()
 
-  env.LOCAL_JABBA_VERSION = "\$JABBA_VERSION"
+  env.LOCAL_JABBA_VERSION = $JABBA_VERSION
   GLOBAL_MAP_HOME[env.LOCAL_JABBA_VERSION] = sh(label: 'Get TEST_JAVA_HOME',script: '''#!/bin/bash -le
     . ${JABBA_SHELL}
     jabba which ${JABBA_VERSION}''', returnStdout: true).trim().toString()
