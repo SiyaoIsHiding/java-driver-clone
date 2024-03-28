@@ -145,6 +145,8 @@ def executeTests() {
   '''
   def LOCAL_JAVA_VERSION=getVersionString(JABBA_VERSION)
   def LOCAL_JAVA_HOME=getJavaHomeString(JABBA_VERSION)
+  println "Version String: $LOCAL_JAVA_VERSION"
+    println "Java Home String: $LOCAL_JAVA_HOME"
   sh label: 'Execute tests', script: '''#!/bin/bash -lex
     # Load CCM environment variables
     set -o allexport
@@ -168,8 +170,9 @@ def executeTests() {
 
     # print the following mvn command
     mvn -B -V ${INTEGRATION_TESTS_FILTER_ARGUMENT} -T 1 verify \
-      -Ptest-jdk-${LOCAL_JAVA_VERSION} \
-      -DtestJavaHome=${LOCAL_JAVA_HOME} \
+    ''' +
+      "-Ptest-jdk-${LOCAL_JAVA_VERSION} \\ "+
+      "-DtestJavaHome=${LOCAL_JAVA_HOME} \\" + '''
       -DfailIfNoTests=false \
       -Dmaven.test.failure.ignore=true \
       -Dmaven.javadoc.skip=${SKIP_JAVADOCS} \
