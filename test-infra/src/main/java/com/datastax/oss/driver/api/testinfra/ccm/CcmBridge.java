@@ -487,6 +487,7 @@ public class CcmBridge implements AutoCloseable {
           .put("request_timeout_in_ms", "request_timeout")
           .put("range_request_timeout_in_ms", "range_request_timeout")
           .put("write_request_timeout_in_ms", "write_request_timeout")
+          .put("batch_size_warn_threshold_in_kb", "batch_size_warn_threshold")
           .build();
 
   private static Function<Object, String> appendMillisecondsFn = v -> v.toString() + "ms";
@@ -496,6 +497,7 @@ public class CcmBridge implements AutoCloseable {
           .put("request_timeout_in_ms", appendMillisecondsFn)
           .put("range_request_timeout_in_ms", appendMillisecondsFn)
           .put("write_request_timeout_in_ms", appendMillisecondsFn)
+          .put("batch_size_warn_threshold_in_kb", v -> v.toString() + "KiB")
           .build();
 
   /**
