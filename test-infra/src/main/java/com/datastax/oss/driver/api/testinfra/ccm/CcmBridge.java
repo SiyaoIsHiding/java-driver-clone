@@ -19,6 +19,7 @@ package com.datastax.oss.driver.api.testinfra.ccm;
 
 import com.datastax.oss.driver.api.core.Version;
 import com.datastax.oss.driver.shaded.guava.common.base.Joiner;
+import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.io.Resources;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -236,16 +237,15 @@ public class CcmBridge implements AutoCloseable {
           Arrays.stream(nodes).mapToObj(n -> "" + n).collect(Collectors.joining(":")),
           createOptions.stream().collect(Collectors.joining(" ")));
 
-      for (Map.Entry<String, Object> conf : cassandraConfiguration.entrySet()) {
-        execute("updateconf", String.format("%s:%s", conf.getKey(), conf.getValue()));
-      }
       Version cassandraVersion = getCassandraVersion();
-      if (cassandraVersion.compareTo(Version.V4_1_0) >= 0) {
-        execute("updateconf", "user_defined_functions_enabled:true");
+      for (Map.Entry<String, Object> conf : cassandraConfiguration.entrySet()) {
+        execute(
+            "updateconf",
+            String.format("%s:%s", getYamlKey(conf.getKey(), cassandraVersion), conf.getValue()));
       }
-      if (cassandraVersion.compareTo(Version.V2_2_0) >= 0
-          && cassandraVersion.compareTo(Version.V4_1_0) < 0) {
-        execute("updateconf", "enable_user_defined_functions:true");
+      if (cassandraVersion.compareTo(Version.V2_2_0) >= 0) {
+        execute(
+            "updateconf", getYamlKey("enable_user_defined_functions", cassandraVersion) + ":true");
       }
       if (DSE_ENABLEMENT) {
         for (Map.Entry<String, Object> conf : dseConfiguration.entrySet()) {
@@ -466,6 +466,37 @@ public class CcmBridge implements AutoCloseable {
     }
 
     return Optional.empty();
+  }
+
+  /**
+   * Overrides necessary to work with CASSANDRA-15234. This isn't meant to be an exhaustive list of
+   * all the changes for that ticket... we just need enough to make ccm happy in order to get tests
+   * running again.
+   */
+  private static Map<String, String> cassandra15234Overrides =
+      ImmutableMap.<String, String>builder()
+          .put("enable_user_defined_functions", "user_defined_functions_enabled")
+          .put("enable_sasi_indexes", "sasi_indexes_enabled")
+          .put("enable_materialized_views", "materialized_views_enabled")
+          .put("read_request_timeout_in_ms", "read_request_timeout")
+          .put("request_timeout_in_ms", "request_timeout")
+          .put("range_request_timeout_in_ms", "range_request_timeout")
+          .put("write_request_timeout_in_ms", "write_request_timeout")
+          .build();
+
+  /**
+   * Compute the correct name for the property, possibly overriding the name as a result of the
+   * recent migration of config properties in Cassandra 4.1.
+   *
+   * @param name the requested property name
+   * @param cassandraVersion the current Cassandra version
+   * @return the property name that should actually be used
+   */
+  private String getYamlKey(String name, Version cassandraVersion) {
+
+    return (cassandraVersion.compareTo(Version.V4_1_0) >= 0)
+        ? cassandra15234Overrides.getOrDefault(name, name)
+        : name;
   }
 
   public static Builder builder() {
