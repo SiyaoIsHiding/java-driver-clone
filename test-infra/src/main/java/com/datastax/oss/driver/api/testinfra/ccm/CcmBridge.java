@@ -18,6 +18,7 @@
 package com.datastax.oss.driver.api.testinfra.ccm;
 
 import com.datastax.oss.driver.api.core.Version;
+import com.datastax.oss.driver.shaded.guava.common.base.Functions;
 import com.datastax.oss.driver.shaded.guava.common.base.Joiner;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.io.Resources;
@@ -39,6 +40,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
@@ -241,7 +243,10 @@ public class CcmBridge implements AutoCloseable {
       for (Map.Entry<String, Object> conf : cassandraConfiguration.entrySet()) {
         execute(
             "updateconf",
-            String.format("%s:%s", getYamlKey(conf.getKey(), cassandraVersion), conf.getValue()));
+            String.format(
+                "%s:%s",
+                getYamlKey(conf.getKey(), cassandraVersion),
+                getYamlValue(conf.getKey(), conf.getValue(), cassandraVersion)));
       }
       if (cassandraVersion.compareTo(Version.V2_2_0) >= 0) {
         execute(
@@ -473,7 +478,7 @@ public class CcmBridge implements AutoCloseable {
    * all the changes for that ticket... we just need enough to make ccm happy in order to get tests
    * running again.
    */
-  private static Map<String, String> cassandra15234Overrides =
+  private static ImmutableMap<String, String> cassandra15234KeyOverrides =
       ImmutableMap.<String, String>builder()
           .put("enable_user_defined_functions", "user_defined_functions_enabled")
           .put("enable_sasi_indexes", "sasi_indexes_enabled")
@@ -484,19 +489,45 @@ public class CcmBridge implements AutoCloseable {
           .put("write_request_timeout_in_ms", "write_request_timeout")
           .build();
 
+  private static Function<Object, String> appendMillisecondsFn = v -> v.toString() + "ms";
+  private static ImmutableMap<String, Function> cassandra15234ValueOverrides =
+      ImmutableMap.<String, Function>builder()
+          .put("read_request_timeout_in_ms", appendMillisecondsFn)
+          .put("request_timeout_in_ms", appendMillisecondsFn)
+          .put("range_request_timeout_in_ms", appendMillisecondsFn)
+          .put("write_request_timeout_in_ms", appendMillisecondsFn)
+          .build();
+
   /**
    * Compute the correct name for the property, possibly overriding the name as a result of the
    * recent migration of config properties in Cassandra 4.1.
    *
-   * @param name the requested property name
+   * @param originalName the requested property name
    * @param cassandraVersion the current Cassandra version
    * @return the property name that should actually be used
    */
-  private String getYamlKey(String name, Version cassandraVersion) {
+  private String getYamlKey(String originalName, Version cassandraVersion) {
 
     return (cassandraVersion.compareTo(Version.V4_1_0) >= 0)
-        ? cassandra15234Overrides.getOrDefault(name, name)
-        : name;
+        ? cassandra15234KeyOverrides.getOrDefault(originalName, originalName)
+        : originalName;
+  }
+
+  /**
+   * Compute the correct value for the property, possibly overriding the name as a result of the
+   * recent migration of config properties in Cassandra 4.1.
+   *
+   * @param originalName the requested property value
+   * @param cassandraVersion the current Cassandra version
+   * @return the property value that should actually be used
+   */
+  private Object getYamlValue(String originalName, Object originalValue, Version cassandraVersion) {
+
+    return (cassandraVersion.compareTo(Version.V4_1_0) >= 0)
+        ? cassandra15234ValueOverrides
+            .getOrDefault(originalName, Functions.identity())
+            .apply(originalValue)
+        : originalValue;
   }
 
   public static Builder builder() {
