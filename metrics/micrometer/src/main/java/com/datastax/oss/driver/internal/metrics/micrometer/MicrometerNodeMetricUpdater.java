@@ -31,7 +31,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import java.util.Set;
-import java.util.function.Supplier;
 import net.jcip.annotations.ThreadSafe;
 
 @ThreadSafe
@@ -39,10 +38,6 @@ public class MicrometerNodeMetricUpdater extends MicrometerMetricUpdater<NodeMet
     implements NodeMetricUpdater {
 
   private final Node node;
-  private final Supplier<Number> openConnectionsSupplier;
-  private final Supplier<Number> streamSupplier;
-  private final Supplier<Number> inFlightRequestsSupplier;
-  private final Supplier<Number> orphanedStreamIdsSupplier;
 
   public MicrometerNodeMetricUpdater(
       Node node,
@@ -51,17 +46,14 @@ public class MicrometerNodeMetricUpdater extends MicrometerMetricUpdater<NodeMet
       MeterRegistry registry) {
     super(context, enabledMetrics, registry);
     this.node = node;
-    openConnectionsSupplier = () -> node.getOpenConnections();
-    streamSupplier = () -> availableStreamIds(node);
-    inFlightRequestsSupplier = () -> inFlightRequests(node);
-    orphanedStreamIdsSupplier = () -> orphanedStreamIds(node);
 
     DriverExecutionProfile profile = context.getConfig().getDefaultProfile();
 
-    initializeGauge(DefaultNodeMetric.OPEN_CONNECTIONS, profile, openConnectionsSupplier);
-    initializeGauge(DefaultNodeMetric.AVAILABLE_STREAMS, profile, streamSupplier);
-    initializeGauge(DefaultNodeMetric.IN_FLIGHT, profile, inFlightRequestsSupplier);
-    initializeGauge(DefaultNodeMetric.ORPHANED_STREAMS, profile, orphanedStreamIdsSupplier);
+    initializeGaugeWeak(DefaultNodeMetric.OPEN_CONNECTIONS, profile, node::getOpenConnections);
+    initializeGaugeWeak(
+        DefaultNodeMetric.AVAILABLE_STREAMS, profile, () -> availableStreamIds(node));
+    initializeGaugeWeak(DefaultNodeMetric.IN_FLIGHT, profile, () -> inFlightRequests(node));
+    initializeGaugeWeak(DefaultNodeMetric.ORPHANED_STREAMS, profile, () -> orphanedStreamIds(node));
 
     initializeCounter(DefaultNodeMetric.UNSENT_REQUESTS, profile);
     initializeCounter(DefaultNodeMetric.ABORTED_REQUESTS, profile);
