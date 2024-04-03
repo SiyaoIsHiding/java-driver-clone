@@ -513,6 +513,7 @@ public class CcmBridge implements AutoCloseable {
 
     String originalValueStr = originalValue.toString();
     if (cassandraVersion.compareTo(Version.V4_1_0) < 0) return originalValueStr;
+    if (originalKey.endsWith(IN_MS_STR)) return originalValueStr + "ms";
     if (originalKey.endsWith(IN_KB_STR)) return originalValueStr + "KiB";
     return originalValueStr;
   }
