@@ -18,9 +18,7 @@
 package com.datastax.oss.driver.api.testinfra.ccm;
 
 import com.datastax.oss.driver.api.core.Version;
-import com.datastax.oss.driver.shaded.guava.common.base.Functions;
 import com.datastax.oss.driver.shaded.guava.common.base.Joiner;
-import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import com.datastax.oss.driver.shaded.guava.common.io.Resources;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -40,7 +38,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.exec.CommandLine;
 import org.apache.commons.exec.DefaultExecutor;
@@ -241,17 +238,31 @@ public class CcmBridge implements AutoCloseable {
 
       Version cassandraVersion = getCassandraVersion();
       for (Map.Entry<String, Object> conf : cassandraConfiguration.entrySet()) {
+        String originalKey = conf.getKey();
+        Object originalValue = conf.getValue();
         execute(
             "updateconf",
-            String.format(
-                "%s:%s",
-                getYamlKey(conf.getKey(), cassandraVersion),
-                getYamlValue(conf.getKey(), conf.getValue(), cassandraVersion)));
+            String.join(
+                ":",
+                getConfigKey(originalKey, originalValue, cassandraVersion),
+                getConfigValue(originalKey, originalValue, cassandraVersion)));
       }
+
+      // If we're dealing with anything more recent than 2.2 explicitly enable UDF... but run it
+      // through our conversion process to make
+      // sure more recent versions don't have a problem.
       if (cassandraVersion.compareTo(Version.V2_2_0) >= 0) {
+        String originalKey = "enable_user_defined_functions";
+        Object originalValue = "true";
         execute(
-            "updateconf", getYamlKey("enable_user_defined_functions", cassandraVersion) + ":true");
+            "updateconf",
+            String.join(
+                ":",
+                getConfigKey(originalKey, originalValue, cassandraVersion),
+                getConfigValue(originalKey, originalValue, cassandraVersion)));
       }
+
+      // Note that we aren't performing any substitution on DSE key/value props (at least for now)
       if (DSE_ENABLEMENT) {
         for (Map.Entry<String, Object> conf : dseConfiguration.entrySet()) {
           execute("updatedseconf", String.format("%s:%s", conf.getKey(), conf.getValue()));
@@ -473,63 +484,36 @@ public class CcmBridge implements AutoCloseable {
     return Optional.empty();
   }
 
-  /**
-   * Overrides necessary to work with CASSANDRA-15234. This isn't meant to be an exhaustive list of
-   * all the changes for that ticket... we just need enough to make ccm happy in order to get tests
-   * running again.
-   */
-  private static ImmutableMap<String, String> cassandra15234KeyOverrides =
-      ImmutableMap.<String, String>builder()
-          .put("enable_user_defined_functions", "user_defined_functions_enabled")
-          .put("enable_sasi_indexes", "sasi_indexes_enabled")
-          .put("enable_materialized_views", "materialized_views_enabled")
-          .put("read_request_timeout_in_ms", "read_request_timeout")
-          .put("request_timeout_in_ms", "request_timeout")
-          .put("range_request_timeout_in_ms", "range_request_timeout")
-          .put("write_request_timeout_in_ms", "write_request_timeout")
-          .put("batch_size_warn_threshold_in_kb", "batch_size_warn_threshold")
-          .build();
+  private static String IN_MS_STR = "_in_ms";
+  private static int IN_MS_STR_LENGTH = IN_MS_STR.length();
+  private static String ENABLE_STR = "enable_";
+  private static int ENABLE_STR_LENGTH = ENABLE_STR.length();
+  private static String IN_KB_STR = "_in_kb";
+  private static int IN_KB_STR_LENGTH = IN_KB_STR.length();
 
-  private static Function<Object, String> appendMillisecondsFn = v -> v.toString() + "ms";
-  private static ImmutableMap<String, Function> cassandra15234ValueOverrides =
-      ImmutableMap.<String, Function>builder()
-          .put("read_request_timeout_in_ms", appendMillisecondsFn)
-          .put("request_timeout_in_ms", appendMillisecondsFn)
-          .put("range_request_timeout_in_ms", appendMillisecondsFn)
-          .put("write_request_timeout_in_ms", appendMillisecondsFn)
-          .put("batch_size_warn_threshold_in_kb", v -> v.toString() + "KiB")
-          .build();
+  private String getConfigKey(String originalKey, Object originalValue, Version cassandraVersion) {
 
-  /**
-   * Compute the correct name for the property, possibly overriding the name as a result of the
-   * recent migration of config properties in Cassandra 4.1.
-   *
-   * @param originalName the requested property name
-   * @param cassandraVersion the current Cassandra version
-   * @return the property name that should actually be used
-   */
-  private String getYamlKey(String originalName, Version cassandraVersion) {
-
-    return (cassandraVersion.compareTo(Version.V4_1_0) >= 0)
-        ? cassandra15234KeyOverrides.getOrDefault(originalName, originalName)
-        : originalName;
+    // At least for now we won't support substitutions on nested keys.  This requires an extra
+    // traversal of the string
+    // but we'll live with that for now
+    if (originalKey.contains(".")) return originalKey;
+    if (cassandraVersion.compareTo(Version.V4_1_0) < 0) return originalKey;
+    if (originalKey.endsWith(IN_MS_STR))
+      return originalKey.substring(0, originalKey.length() - IN_MS_STR_LENGTH);
+    if (originalKey.startsWith(ENABLE_STR))
+      return originalKey.substring(ENABLE_STR_LENGTH) + "_enabled";
+    if (originalKey.endsWith(IN_KB_STR))
+      return originalKey.substring(0, originalKey.length() - IN_KB_STR_LENGTH);
+    return originalKey;
   }
 
-  /**
-   * Compute the correct value for the property, possibly overriding the name as a result of the
-   * recent migration of config properties in Cassandra 4.1.
-   *
-   * @param originalName the requested property value
-   * @param cassandraVersion the current Cassandra version
-   * @return the property value that should actually be used
-   */
-  private Object getYamlValue(String originalName, Object originalValue, Version cassandraVersion) {
+  private String getConfigValue(
+      String originalKey, Object originalValue, Version cassandraVersion) {
 
-    return (cassandraVersion.compareTo(Version.V4_1_0) >= 0)
-        ? cassandra15234ValueOverrides
-            .getOrDefault(originalName, Functions.identity())
-            .apply(originalValue)
-        : originalValue;
+    String originalValueStr = originalValue.toString();
+    if (cassandraVersion.compareTo(Version.V4_1_0) < 0) return originalValueStr;
+    if (originalKey.endsWith(IN_KB_STR)) return originalValueStr + "KiB";
+    return originalValueStr;
   }
 
   public static Builder builder() {
