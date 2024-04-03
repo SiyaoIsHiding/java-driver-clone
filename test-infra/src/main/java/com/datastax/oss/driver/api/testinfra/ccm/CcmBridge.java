@@ -491,6 +491,7 @@ public class CcmBridge implements AutoCloseable {
   private static String IN_KB_STR = "_in_kb";
   private static int IN_KB_STR_LENGTH = IN_KB_STR.length();
 
+  @SuppressWarnings("unused")
   private String getConfigKey(String originalKey, Object originalValue, Version cassandraVersion) {
 
     // At least for now we won't support substitutions on nested keys.  This requires an extra
