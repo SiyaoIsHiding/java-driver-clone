@@ -35,6 +35,8 @@ import com.datastax.oss.driver.api.core.ssl.SslEngineFactory;
 import com.datastax.oss.driver.api.core.time.TimestampGenerator;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
 import edu.umd.cs.findbugs.annotations.NonNull;
+import edu.umd.cs.findbugs.annotations.Nullable;
+import io.opentelemetry.api.OpenTelemetry;
 import java.util.Map;
 import java.util.Optional;
 
@@ -150,4 +152,13 @@ public interface DriverContext extends AttachmentPoint {
   /** @return The driver's schema change listener; never {@code null}. */
   @NonNull
   SchemaChangeListener getSchemaChangeListener();
+
+  default void setOpenTelemetry(OpenTelemetry openTelemetry) {
+    // no-op
+  }
+
+  @Nullable
+  default OpenTelemetry getOpenTelemetry() {
+    return null;
+  }
 }

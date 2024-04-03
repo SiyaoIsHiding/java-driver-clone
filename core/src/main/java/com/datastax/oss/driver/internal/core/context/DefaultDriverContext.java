@@ -104,6 +104,7 @@ import com.datastax.oss.protocol.internal.SegmentCodec;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.buffer.ByteBuf;
+import io.opentelemetry.api.OpenTelemetry;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -247,6 +248,8 @@ public class DefaultDriverContext implements InternalDriverContext {
   // A stack trace captured in the constructor. Used to extract information about the client
   // application.
   private final StackTraceElement[] initStackTrace;
+
+  private OpenTelemetry openTelemetry = null;
 
   public DefaultDriverContext(
       DriverConfigLoader configLoader, ProgrammaticArguments programmaticArguments) {
@@ -1036,5 +1039,16 @@ public class DefaultDriverContext implements InternalDriverContext {
   @Override
   public Object getMetricRegistry() {
     return metricRegistry;
+  }
+
+  @Override
+  public void setOpenTelemetry(OpenTelemetry openTelemetry) {
+    this.openTelemetry = openTelemetry;
+  }
+
+  @Override
+  @Nullable
+  public OpenTelemetry getOpenTelemetry() {
+    return openTelemetry;
   }
 }
