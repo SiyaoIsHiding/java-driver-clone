@@ -335,7 +335,7 @@ public class CqlRequestHandler implements Throttled {
       ExecutionInfo executionInfo =
           buildExecutionInfo(callback, resultMessage, responseFrame, schemaInAgreement);
       AsyncResultSet resultSet =
-          Conversions.toResultSet(resultMessage, executionInfo, session, context);
+          Conversions.toResultSet(resultMessage, executionInfo, session, context, span);
       if (result.complete(resultSet)) {
         cancelScheduledTasks();
         throttler.signalSuccess(this);
@@ -623,6 +623,7 @@ public class CqlRequestHandler implements Throttled {
     @Override
     public void onResponse(Frame responseFrame) {
       CqlRequestHandler.this.span.addEvent("Response received");
+      CqlRequestHandler.this.span.end();
       long nodeResponseTimeNanos = NANOTIME_NOT_MEASURED_YET;
       NodeMetricUpdater nodeMetricUpdater = ((DefaultNode) node).getMetricUpdater();
       if (nodeMetricUpdater.isEnabled(DefaultNodeMetric.CQL_MESSAGES, executionProfile.getName())) {
