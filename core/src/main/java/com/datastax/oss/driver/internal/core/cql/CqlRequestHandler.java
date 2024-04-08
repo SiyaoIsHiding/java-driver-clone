@@ -148,6 +148,7 @@ public class CqlRequestHandler implements Throttled {
             .getTracer(CqlRequestHandler.class.getName());
     this.span = tracer.spanBuilder("Driver Cql Request").startSpan();
     span.addEvent("RequestHandler created");
+    context.getRequestTracker();
 
     this.startTimeNanos = System.nanoTime();
     this.logPrefix = sessionLogPrefix + "|" + this.hashCode();
