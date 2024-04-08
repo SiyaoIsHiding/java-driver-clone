@@ -266,7 +266,7 @@ public class SchemaIT {
                   + "    unit text,\n"
                   + "    PRIMARY KEY (keyspace_name, table_name, task_id)\n"
                   + "); */",
-              // Cassandra 4.1
+              // Cassandra 4.1 +
               "/* VIRTUAL TABLE system_views.sstable_tasks (\n"
                   + "    keyspace_name text,\n"
                   + "    table_name text,\n"

@@ -114,7 +114,7 @@ def executeTests() {
     jabba which ${JABBA_VERSION}''', returnStdout: true).trim()
   def testJavaVersion = (JABBA_VERSION =~ /.*\.(\d+)/)[0][1]
 
-  def executeTestScript = '''#!/bin/bash -le
+  def executeTestScript = '''#!/bin/bash -lex
     # Load CCM environment variables
     set -o allexport
     . ${HOME}/environment.txt
@@ -300,6 +300,10 @@ pipeline {
                           <td>Apache Cassandra&reg; v4.1.x</td>
                         </tr>
                         <tr>
+                          <td><strong>5.0</strong></td>
+                          <td>Apache Cassandra&reg; v5.0.x</td>
+                        </tr>
+                        <tr>
                           <td><strong>dse-4.8.16</strong></td>
                           <td>DataStax Enterprise v4.8.x (<b>END OF SERVICE LIFE</b>)</td>
                         </tr>
@@ -452,6 +456,7 @@ pipeline {
             name 'SERVER_VERSION'
             values '3.11',     // Latest stable Apache CassandraⓇ
                    '4.1',      // Development Apache CassandraⓇ
+                    '5.0',      // Development Apache CassandraⓇ
                    'dse-6.8.30' // Current DataStax Enterprise
           }
           axis {
