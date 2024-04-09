@@ -30,11 +30,16 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import java.util.Set;
+import java.util.function.Supplier;
 import net.jcip.annotations.ThreadSafe;
 
 @ThreadSafe
 public class MicrometerSessionMetricUpdater extends MicrometerMetricUpdater<SessionMetric>
     implements SessionMetricUpdater {
+  private final Supplier<Number> connectedNodesSupplier = this::connectedNodes;
+  private final Supplier<Number> throttlingQueueSizeSupplier = this::throttlingQueueSize;
+  private final Supplier<Number> preparedStatementCacheSizeSupplier =
+      this::preparedStatementCacheSize;
 
   public MicrometerSessionMetricUpdater(
       InternalDriverContext context, Set<SessionMetric> enabledMetrics, MeterRegistry registry) {
@@ -42,11 +47,11 @@ public class MicrometerSessionMetricUpdater extends MicrometerMetricUpdater<Sess
 
     DriverExecutionProfile profile = context.getConfig().getDefaultProfile();
 
-    initializeGaugeWeak(DefaultSessionMetric.CONNECTED_NODES, profile, this::connectedNodes);
-    initializeGaugeWeak(
-        DefaultSessionMetric.THROTTLING_QUEUE_SIZE, profile, this::throttlingQueueSize);
-    initializeGaugeWeak(
-        DefaultSessionMetric.CQL_PREPARED_CACHE_SIZE, profile, this::preparedStatementCacheSize);
+    initializeGauge(DefaultSessionMetric.CONNECTED_NODES, profile, connectedNodesSupplier);
+    initializeGauge(
+        DefaultSessionMetric.THROTTLING_QUEUE_SIZE, profile, throttlingQueueSizeSupplier);
+    initializeGauge(
+        DefaultSessionMetric.CQL_PREPARED_CACHE_SIZE, profile, preparedStatementCacheSizeSupplier);
 
     initializeCounter(DefaultSessionMetric.CQL_CLIENT_TIMEOUTS, profile);
     initializeCounter(DefaultSessionMetric.THROTTLING_ERRORS, profile);
