@@ -92,6 +92,14 @@ public abstract class MicrometerMetricUpdater<MetricT> extends AbstractMetricUpd
 
   protected abstract MetricId getMetricId(MetricT metric);
 
+  /**
+   * Initializes a gauge metric using WEAK references to avoid memory leaks.
+   * You need to keep a strong reference somewhere, and clear it when the gauge is no longer needed.
+   * Otherwise, the gauge will be NaN.
+   * @param metric the metric to initialize
+   * @param profile the profile in use
+   * @param supplier the supplier, which is pointed by a weak reference
+   */
   protected void initializeGauge(
       MetricT metric, DriverExecutionProfile profile, Supplier<Number> supplier) {
     if (isEnabled(metric, profile.getName())) {
