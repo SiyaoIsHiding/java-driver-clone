@@ -105,6 +105,22 @@ public abstract class MicrometerMetricUpdater<MetricT> extends AbstractMetricUpd
     }
   }
 
+  protected void initializeGaugeWeak(
+      MetricT metric, DriverExecutionProfile profile, Supplier<Number> supplier) {
+    if (isEnabled(metric, profile.getName())) {
+      metrics.computeIfAbsent(
+          metric,
+          m -> {
+            MetricId id = getMetricId(m);
+            Iterable<Tag> tags = MicrometerTags.toMicrometerTags(id.getTags());
+            return Gauge.builder(id.getName(), supplier)
+                .strongReference(false)
+                .tags(tags)
+                .register(registry);
+          });
+    }
+  }
+
   protected void initializeCounter(MetricT metric, DriverExecutionProfile profile) {
     if (isEnabled(metric, profile.getName())) {
       getOrCreateCounterFor(metric);
