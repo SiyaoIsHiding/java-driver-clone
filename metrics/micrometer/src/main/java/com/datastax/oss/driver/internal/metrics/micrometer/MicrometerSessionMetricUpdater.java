@@ -42,10 +42,9 @@ public class MicrometerSessionMetricUpdater extends MicrometerMetricUpdater<Sess
 
     DriverExecutionProfile profile = context.getConfig().getDefaultProfile();
 
-    initializeGaugeWeak(DefaultSessionMetric.CONNECTED_NODES, profile, this::connectedNodes);
-    initializeGaugeWeak(
-        DefaultSessionMetric.THROTTLING_QUEUE_SIZE, profile, this::throttlingQueueSize);
-    initializeGaugeWeak(
+    initializeGauge(DefaultSessionMetric.CONNECTED_NODES, profile, this::connectedNodes);
+    initializeGauge(DefaultSessionMetric.THROTTLING_QUEUE_SIZE, profile, this::throttlingQueueSize);
+    initializeGauge(
         DefaultSessionMetric.CQL_PREPARED_CACHE_SIZE, profile, this::preparedStatementCacheSize);
 
     initializeCounter(DefaultSessionMetric.CQL_CLIENT_TIMEOUTS, profile);
