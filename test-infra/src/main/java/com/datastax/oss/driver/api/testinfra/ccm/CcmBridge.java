@@ -211,6 +211,9 @@ public class CcmBridge implements AutoCloseable {
       }
       return sb.toString();
     }
+    if (version.getMajor() == 5 && version.getMinor() == 0) {
+      return "5.0";
+    }
     return version.toString();
   }
 
