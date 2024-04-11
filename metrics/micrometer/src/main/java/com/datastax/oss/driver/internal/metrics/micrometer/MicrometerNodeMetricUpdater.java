@@ -39,9 +39,6 @@ public class MicrometerNodeMetricUpdater extends MicrometerMetricUpdater<NodeMet
     implements NodeMetricUpdater {
 
   private final Node node;
-
-  // To keep strong references to these suppliers.
-  // Otherwise, they will be garbage collected, and the metrics will become NaN
   private final Supplier<Number> openConnectionsSupplier;
   private final Supplier<Number> streamSupplier;
   private final Supplier<Number> inFlightRequestsSupplier;
