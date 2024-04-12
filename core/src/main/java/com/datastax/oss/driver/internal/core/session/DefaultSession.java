@@ -46,17 +46,7 @@ import com.datastax.oss.driver.internal.core.util.concurrent.RunOrSchedule;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.netty.util.concurrent.EventExecutor;
-import io.opentelemetry.api.OpenTelemetry;
-import io.opentelemetry.api.common.Attributes;
-import io.opentelemetry.exporter.jaeger.JaegerGrpcSpanExporter;
-import io.opentelemetry.sdk.OpenTelemetrySdk;
-import io.opentelemetry.sdk.resources.Resource;
-import io.opentelemetry.sdk.trace.SdkTracerProvider;
-import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
-import io.opentelemetry.semconv.resource.attributes.ResourceAttributes;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -67,7 +57,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import net.jcip.annotations.ThreadSafe;
@@ -157,40 +146,7 @@ public class DefaultSession implements CqlSession {
 
   private CompletionStage<CqlSession> init(CqlIdentifier keyspace) {
     RunOrSchedule.on(adminExecutor, () -> singleThreaded.init(keyspace));
-    OpenTelemetry openTelemetry = initOpenTelemetry();
-    this.context.setOpenTelemetry(openTelemetry);
     return singleThreaded.initFuture;
-  }
-
-  private static final String OTEL_SERVICE_NAME = "cassandra-java-driver";
-
-  static OpenTelemetry initOpenTelemetry() {
-    // Create a channel towards Jaeger end point
-    ManagedChannel jaegerChannel =
-        ManagedChannelBuilder.forAddress("localhost", 14250).usePlaintext().build();
-    // Export traces to Jaeger
-    JaegerGrpcSpanExporter jaegerExporter =
-        JaegerGrpcSpanExporter.builder()
-            .setChannel(jaegerChannel)
-            .setTimeout(30, TimeUnit.SECONDS)
-            .build();
-
-    Resource serviceNameResource =
-        Resource.create(Attributes.of(ResourceAttributes.SERVICE_NAME, OTEL_SERVICE_NAME));
-
-    // Set to process the spans by the Jaeger Exporter
-    SdkTracerProvider tracerProvider =
-        SdkTracerProvider.builder()
-            .addSpanProcessor(SimpleSpanProcessor.create(jaegerExporter))
-            .setResource(Resource.getDefault().merge(serviceNameResource))
-            .build();
-    OpenTelemetrySdk openTelemetry =
-        OpenTelemetrySdk.builder().setTracerProvider(tracerProvider).build();
-
-    // it's always a good idea to shut down the SDK cleanly at JVM exit.
-    Runtime.getRuntime().addShutdownHook(new Thread(tracerProvider::shutdown));
-
-    return openTelemetry;
   }
 
   @NonNull

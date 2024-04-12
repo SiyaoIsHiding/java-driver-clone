@@ -77,14 +77,11 @@ import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-import io.opentelemetry.api.trace.Span;
-import io.opentelemetry.api.trace.Tracer;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -134,20 +131,11 @@ public class CqlRequestHandler implements Throttled {
   // We don't use a map because nodes can appear multiple times.
   private volatile List<Map.Entry<Node, Throwable>> errors;
 
-  private Tracer tracer;
-
-  private Span span;
-
   protected CqlRequestHandler(
       Statement<?> statement,
       DefaultSession session,
       InternalDriverContext context,
       String sessionLogPrefix) {
-    this.tracer =
-        Objects.requireNonNull(context.getOpenTelemetry())
-            .getTracer(CqlRequestHandler.class.getName());
-    this.span = tracer.spanBuilder("Driver Cql Request").startSpan();
-    span.addEvent("RequestHandler created");
     context.getRequestTracker();
 
     this.startTimeNanos = System.nanoTime();
@@ -296,7 +284,6 @@ public class CqlRequestHandler implements Throttled {
           .write(message, statement.isTracing(), statement.getCustomPayload(), nodeResponseCallback)
           .addListener(nodeResponseCallback);
     }
-    this.span.addEvent("Request sent");
   }
 
   private void recordError(Node node, Throwable error) {
@@ -336,7 +323,7 @@ public class CqlRequestHandler implements Throttled {
       ExecutionInfo executionInfo =
           buildExecutionInfo(callback, resultMessage, responseFrame, schemaInAgreement);
       AsyncResultSet resultSet =
-          Conversions.toResultSet(resultMessage, executionInfo, session, context, span);
+          Conversions.toResultSet(resultMessage, executionInfo, session, context);
       if (result.complete(resultSet)) {
         cancelScheduledTasks();
         throttler.signalSuccess(this);
@@ -354,7 +341,8 @@ public class CqlRequestHandler implements Throttled {
               nodeLatencyNanos,
               callback.executionProfile,
               callback.node,
-              logPrefix);
+              logPrefix,
+              resultSet);
           requestTracker.onSuccess(
               callback.statement,
               totalLatencyNanos,
@@ -623,8 +611,6 @@ public class CqlRequestHandler implements Throttled {
 
     @Override
     public void onResponse(Frame responseFrame) {
-      CqlRequestHandler.this.span.addEvent("Response received");
-      CqlRequestHandler.this.span.end();
       long nodeResponseTimeNanos = NANOTIME_NOT_MEASURED_YET;
       NodeMetricUpdater nodeMetricUpdater = ((DefaultNode) node).getMetricUpdater();
       if (nodeMetricUpdater.isEnabled(DefaultNodeMetric.CQL_MESSAGES, executionProfile.getName())) {

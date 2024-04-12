@@ -18,6 +18,8 @@
 package com.datastax.oss.driver.api.core.tracker;
 
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.context.DriverContext;
+import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
@@ -34,6 +36,12 @@ import edu.umd.cs.findbugs.annotations.Nullable;
  * SessionBuilder#addRequestTracker(RequestTracker)}.
  */
 public interface RequestTracker extends AutoCloseable {
+
+  default void onRequestHandlerCreated(
+      @NonNull DriverContext context, @NonNull String requestLogPrefix) {}
+
+  default void onRequestSent(
+      @NonNull Request request, @NonNull Node node, @NonNull String requestLogPrefix) {}
 
   /**
    * @deprecated This method only exists for backward compatibility. Override {@link
@@ -157,6 +165,18 @@ public interface RequestTracker extends AutoCloseable {
       @NonNull DriverExecutionProfile executionProfile,
       @NonNull Node node,
       @NonNull String requestLogPrefix) {
+    // If client doesn't override onNodeSuccess with requestLogPrefix delegate call to the old
+    // method
+    onNodeSuccess(request, latencyNanos, executionProfile, node);
+  }
+
+  default void onNodeSuccess(
+      @NonNull Request request,
+      long latencyNanos,
+      @NonNull DriverExecutionProfile executionProfile,
+      @NonNull Node node,
+      @NonNull String requestLogPrefix,
+      @NonNull AsyncResultSet resultSet) {
     // If client doesn't override onNodeSuccess with requestLogPrefix delegate call to the old
     // method
     onNodeSuccess(request, latencyNanos, executionProfile, node);

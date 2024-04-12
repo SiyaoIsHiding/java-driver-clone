@@ -92,7 +92,6 @@ import com.datastax.oss.protocol.internal.response.result.RowsMetadata;
 import com.datastax.oss.protocol.internal.util.Bytes;
 import com.datastax.oss.protocol.internal.util.collection.NullAllowingImmutableList;
 import com.datastax.oss.protocol.internal.util.collection.NullAllowingImmutableMap;
-import io.opentelemetry.api.trace.Span;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -328,27 +327,6 @@ public class Conversions {
       ColumnDefinitions columnDefinitions = getResultDefinitions(rows, statement, context);
       return new DefaultAsyncResultSet(
           columnDefinitions, executionInfo, rows.getData(), session, context);
-    } else if (result instanceof Prepared) {
-      // This should never happen
-      throw new IllegalArgumentException("Unexpected PREPARED response to a CQL query");
-    } else {
-      // Void, SetKeyspace, SchemaChange
-      return DefaultAsyncResultSet.empty(executionInfo);
-    }
-  }
-
-  public static AsyncResultSet toResultSet(
-      Result result,
-      ExecutionInfo executionInfo,
-      CqlSession session,
-      InternalDriverContext context,
-      Span span) {
-    if (result instanceof Rows) {
-      Rows rows = (Rows) result;
-      Statement<?> statement = (Statement<?>) executionInfo.getRequest();
-      ColumnDefinitions columnDefinitions = getResultDefinitions(rows, statement, context);
-      return new DefaultAsyncResultSet(
-          columnDefinitions, executionInfo, rows.getData(), session, context, span);
     } else if (result instanceof Prepared) {
       // This should never happen
       throw new IllegalArgumentException("Unexpected PREPARED response to a CQL query");

@@ -103,8 +103,17 @@ import com.datastax.oss.protocol.internal.ProtocolV6ClientCodecs;
 import com.datastax.oss.protocol.internal.SegmentCodec;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.netty.buffer.ByteBuf;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.exporter.jaeger.JaegerGrpcSpanExporter;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.resources.Resource;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
+import io.opentelemetry.semconv.resource.attributes.ResourceAttributes;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -112,6 +121,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import net.jcip.annotations.ThreadSafe;
@@ -139,6 +149,9 @@ import org.slf4j.LoggerFactory;
 public class DefaultDriverContext implements InternalDriverContext {
 
   private static final Logger LOG = LoggerFactory.getLogger(InternalDriverContext.class);
+
+  private static final String OTEL_SERVICE_NAME = "cassandra-java-driver";
+
   private static final AtomicInteger SESSION_NAME_COUNTER = new AtomicInteger();
 
   protected final CycleDetector cycleDetector =
@@ -1042,13 +1055,40 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   @Override
-  public void setOpenTelemetry(OpenTelemetry openTelemetry) {
-    this.openTelemetry = openTelemetry;
+  @NonNull
+  public OpenTelemetry getOpenTelemetry() {
+    if (openTelemetry == null) {
+      initOpenTelemetry();
+    }
+    return openTelemetry;
   }
 
-  @Override
-  @Nullable
-  public OpenTelemetry getOpenTelemetry() {
+  static OpenTelemetry initOpenTelemetry() {
+    // Create a channel towards Jaeger end point
+    ManagedChannel jaegerChannel =
+        ManagedChannelBuilder.forAddress("localhost", 14250).usePlaintext().build();
+    // Export traces to Jaeger
+    JaegerGrpcSpanExporter jaegerExporter =
+        JaegerGrpcSpanExporter.builder()
+            .setChannel(jaegerChannel)
+            .setTimeout(30, TimeUnit.SECONDS)
+            .build();
+
+    Resource serviceNameResource =
+        Resource.create(Attributes.of(ResourceAttributes.SERVICE_NAME, OTEL_SERVICE_NAME));
+
+    // Set to process the spans by the Jaeger Exporter
+    SdkTracerProvider tracerProvider =
+        SdkTracerProvider.builder()
+            .addSpanProcessor(SimpleSpanProcessor.create(jaegerExporter))
+            .setResource(Resource.getDefault().merge(serviceNameResource))
+            .build();
+    OpenTelemetrySdk openTelemetry =
+        OpenTelemetrySdk.builder().setTracerProvider(tracerProvider).build();
+
+    // it's always a good idea to shut down the SDK cleanly at JVM exit.
+    Runtime.getRuntime().addShutdownHook(new Thread(tracerProvider::shutdown));
+
     return openTelemetry;
   }
 }

@@ -19,7 +19,6 @@ package com.datastax.oss.driver.api.core.cql;
 
 import com.datastax.oss.driver.api.core.AsyncPagingIterable;
 import com.datastax.oss.driver.api.core.CqlSession;
-import io.opentelemetry.api.trace.Span;
 
 /**
  * The result of an asynchronous CQL query.
@@ -43,8 +42,4 @@ public interface AsyncResultSet extends AsyncPagingIterable<Row, AsyncResultSet>
    */
   @Override
   boolean wasApplied();
-
-  default Span getSpan() {
-    return null;
-  }
 }
