@@ -20,6 +20,7 @@ package com.datastax.oss.driver.api.core.tracker;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
+import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
@@ -41,7 +42,7 @@ public interface RequestTracker extends AutoCloseable {
       @NonNull DriverContext context, @NonNull String requestLogPrefix) {}
 
   default void onRequestSent(
-      @NonNull Request request, @NonNull Node node, @NonNull String requestLogPrefix) {}
+      @NonNull Statement<?> statement, @NonNull Node node, @NonNull String requestLogPrefix) {}
 
   /**
    * @deprecated This method only exists for backward compatibility. Override {@link

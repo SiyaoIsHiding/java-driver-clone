@@ -1058,7 +1058,7 @@ public class DefaultDriverContext implements InternalDriverContext {
   @NonNull
   public OpenTelemetry getOpenTelemetry() {
     if (openTelemetry == null) {
-      initOpenTelemetry();
+      this.openTelemetry = initOpenTelemetry();
     }
     return openTelemetry;
   }

@@ -173,6 +173,8 @@ public class CqlRequestHandler implements Throttled {
 
     this.throttler = context.getRequestThrottler();
     this.throttler.register(this);
+
+    requestTracker.onRequestHandlerCreated(context, logPrefix);
   }
 
   @Override
@@ -283,6 +285,7 @@ public class CqlRequestHandler implements Throttled {
       channel
           .write(message, statement.isTracing(), statement.getCustomPayload(), nodeResponseCallback)
           .addListener(nodeResponseCallback);
+      requestTracker.onRequestSent(statement, node, logPrefix);
     }
   }
 

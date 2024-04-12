@@ -27,7 +27,6 @@ import com.datastax.oss.driver.api.core.type.DataTypes;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.util.CountingIterator;
 import edu.umd.cs.findbugs.annotations.NonNull;
-import io.opentelemetry.api.trace.Span;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
@@ -48,8 +47,6 @@ public class DefaultAsyncResultSet implements AsyncResultSet {
   private final CountingIterator<Row> iterator;
   private final Iterable<Row> currentPage;
 
-  private Span span = null;
-
   public DefaultAsyncResultSet(
       ColumnDefinitions definitions,
       ExecutionInfo executionInfo,
@@ -68,28 +65,6 @@ public class DefaultAsyncResultSet implements AsyncResultSet {
           }
         };
     this.currentPage = () -> iterator;
-  }
-
-  public DefaultAsyncResultSet(
-      ColumnDefinitions definitions,
-      ExecutionInfo executionInfo,
-      Queue<List<ByteBuffer>> data,
-      CqlSession session,
-      InternalDriverContext context,
-      Span span) {
-    this.definitions = definitions;
-    this.executionInfo = executionInfo;
-    this.session = session;
-    this.iterator =
-        new CountingIterator<Row>(data.size()) {
-          @Override
-          protected Row computeNext() {
-            List<ByteBuffer> rowData = data.poll();
-            return (rowData == null) ? endOfData() : new DefaultRow(definitions, rowData, context);
-          }
-        };
-    this.currentPage = () -> iterator;
-    this.span = span;
   }
 
   @NonNull
@@ -149,11 +124,6 @@ public class DefaultAsyncResultSet implements AsyncResultSet {
       // nowhere left to read the boolean from.
       throw new IllegalStateException("This method must be called before consuming all the rows");
     }
-  }
-
-  @Override
-  public Span getSpan() {
-    return span;
   }
 
   static AsyncResultSet empty(final ExecutionInfo executionInfo) {

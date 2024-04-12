@@ -18,6 +18,9 @@
 package com.datastax.oss.driver.internal.core.tracker;
 
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
+import com.datastax.oss.driver.api.core.context.DriverContext;
+import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
+import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;
@@ -77,6 +80,24 @@ public class MultiplexingRequestTracker implements RequestTracker {
   }
 
   @Override
+  public void onRequestHandlerCreated(
+      @NonNull DriverContext context, @NonNull String requestLogPrefix) {
+    invokeTrackers(
+        tracker -> tracker.onRequestHandlerCreated(context, requestLogPrefix),
+        requestLogPrefix,
+        "onRequestHandlerCreated");
+  }
+
+  @Override
+  public void onRequestSent(
+      @NonNull Statement<?> statement, @NonNull Node node, @NonNull String requestLogPrefix) {
+    invokeTrackers(
+        tracker -> tracker.onRequestSent(statement, node, requestLogPrefix),
+        requestLogPrefix,
+        "onRequestSent");
+  }
+
+  @Override
   public void onSuccess(
       @NonNull Request request,
       long latencyNanos,
@@ -113,6 +134,22 @@ public class MultiplexingRequestTracker implements RequestTracker {
     invokeTrackers(
         tracker -> tracker.onNodeSuccess(request, latencyNanos, executionProfile, node, logPrefix),
         logPrefix,
+        "onNodeSuccess");
+  }
+
+  @Override
+  public void onNodeSuccess(
+      @NonNull Request request,
+      long latencyNanos,
+      @NonNull DriverExecutionProfile executionProfile,
+      @NonNull Node node,
+      @NonNull String requestLogPrefix,
+      @NonNull AsyncResultSet resultSet) {
+    invokeTrackers(
+        tracker ->
+            tracker.onNodeSuccess(
+                request, latencyNanos, executionProfile, node, requestLogPrefix, resultSet),
+        requestLogPrefix,
         "onNodeSuccess");
   }
 

@@ -1,3 +1,20 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.datastax.oss.driver.internal.core.tracker;
 
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
@@ -22,16 +39,20 @@ import java.util.Objects;
 
 public class OtelRequestTracker implements RequestTracker {
 
-  private Map<String, Span> logPrefixToSpanMap;
+  private final Map<String, Span> logPrefixToSpanMap =
+      new java.util.concurrent.ConcurrentHashMap<>();
 
-  private Map<String, Tracer> logPrefixToTracer;
+  private final Tracer tracer;
 
-  public void onRequestHandlerCreated(
-      @NonNull DriverContext context, @NonNull String requestLogPrefix) {
-    Tracer tracer =
+  public OtelRequestTracker(DriverContext context) {
+    this.tracer =
         Objects.requireNonNull(context.getOpenTelemetry())
             .getTracer("com.datastax.oss.driver.internal.core.tracker.OtelRequestTracker");
-    logPrefixToTracer.put(requestLogPrefix, tracer);
+  }
+
+  @Override
+  public void onRequestHandlerCreated(
+      @NonNull DriverContext context, @NonNull String requestLogPrefix) {
     Span span = tracer.spanBuilder("Driver Internal Tracing").startSpan();
     span.addEvent("Request handler created");
     span.setAttribute("Session name", context.getSessionName());
@@ -39,6 +60,7 @@ public class OtelRequestTracker implements RequestTracker {
     logPrefixToSpanMap.put(requestLogPrefix, span);
   }
 
+  @Override
   public void onRequestSent(
       @NonNull Statement<?> statement, @NonNull Node node, @NonNull String requestLogPrefix) {
     Span span = logPrefixToSpanMap.get(requestLogPrefix);
@@ -48,7 +70,6 @@ public class OtelRequestTracker implements RequestTracker {
 
   @Override
   public void close() throws Exception {
-    logPrefixToTracer.clear();
     logPrefixToSpanMap.clear();
   }
 
@@ -66,7 +87,6 @@ public class OtelRequestTracker implements RequestTracker {
     span.recordException(error);
     span.end();
     logPrefixToSpanMap.remove(requestLogPrefix);
-    logPrefixToTracer.remove(requestLogPrefix);
   }
 
   @Override
@@ -85,11 +105,10 @@ public class OtelRequestTracker implements RequestTracker {
     // TODO: this must not be called on a driver thread
     if (resultSet.getExecutionInfo().getTracingId() != null) {
       QueryTrace queryTrace = resultSet.getExecutionInfo().getQueryTrace();
-      addCassandraQueryTraceToSpan(span, requestLogPrefix, queryTrace);
+      addCassandraQueryTraceToSpan(span, queryTrace);
     }
     span.end();
     logPrefixToSpanMap.remove(requestLogPrefix);
-    logPrefixToTracer.remove(requestLogPrefix);
   }
 
   private static String statementToString(Statement<?> statement) {
@@ -110,11 +129,9 @@ public class OtelRequestTracker implements RequestTracker {
     }
   }
 
-  private void addCassandraQueryTraceToSpan(
-      Span parentSpan, String requestLogPrefix, QueryTrace queryTrace) {
+  private void addCassandraQueryTraceToSpan(Span parentSpan, QueryTrace queryTrace) {
     Span span =
-        logPrefixToTracer
-            .get(requestLogPrefix)
+        this.tracer
             .spanBuilder("Cassandra Internal")
             .setStartTimestamp(Instant.ofEpochMilli(queryTrace.getStartedAt()))
             .setParent(Context.current().with(parentSpan))
