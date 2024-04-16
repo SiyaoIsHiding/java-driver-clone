@@ -104,10 +104,15 @@ public class OtelRequestTracker implements RequestTracker {
     // add cassandra query trace
     // TODO: this must not be called on a driver thread
     if (resultSet.getExecutionInfo().getTracingId() != null) {
-      QueryTrace queryTrace = resultSet.getExecutionInfo().getQueryTrace();
-      addCassandraQueryTraceToSpan(span, queryTrace);
+
+      new Thread(
+              () -> {
+                QueryTrace queryTrace = resultSet.getExecutionInfo().getQueryTrace();
+                addCassandraQueryTraceToSpan(span, queryTrace);
+                span.end();
+              })
+          .start();
     }
-    span.end();
     logPrefixToSpanMap.remove(requestLogPrefix);
   }
 

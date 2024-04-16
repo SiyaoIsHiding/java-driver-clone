@@ -171,10 +171,10 @@ public class CqlRequestHandler implements Throttled {
     Duration timeout = Conversions.resolveRequestTimeout(statement, context);
     this.scheduledTimeout = scheduleTimeout(timeout);
 
+    requestTracker.onRequestHandlerCreated(context, logPrefix);
+
     this.throttler = context.getRequestThrottler();
     this.throttler.register(this);
-
-    requestTracker.onRequestHandlerCreated(context, logPrefix);
   }
 
   @Override
