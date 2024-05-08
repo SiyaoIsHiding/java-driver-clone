@@ -484,7 +484,7 @@ pipeline {
           }
           stage('Build-Driver') {
             steps {
-              buildDriver('8')
+              buildDriver('1.8')
             }
           }
           stage('Execute-Tests') {
@@ -601,7 +601,7 @@ pipeline {
           stage('Build-Driver') {
             steps {
               // Jabba default should be a JDK8 for now
-              buildDriver('8')
+              buildDriver('1.8')
             }
           }
           stage('Execute-Tests') {
