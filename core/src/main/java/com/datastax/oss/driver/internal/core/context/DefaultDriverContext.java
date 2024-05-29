@@ -103,17 +103,8 @@ import com.datastax.oss.protocol.internal.ProtocolV6ClientCodecs;
 import com.datastax.oss.protocol.internal.SegmentCodec;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
-import io.grpc.ManagedChannel;
-import io.grpc.ManagedChannelBuilder;
 import io.netty.buffer.ByteBuf;
 import io.opentelemetry.api.OpenTelemetry;
-import io.opentelemetry.api.common.Attributes;
-import io.opentelemetry.exporter.jaeger.JaegerGrpcSpanExporter;
-import io.opentelemetry.sdk.OpenTelemetrySdk;
-import io.opentelemetry.sdk.resources.Resource;
-import io.opentelemetry.sdk.trace.SdkTracerProvider;
-import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
-import io.opentelemetry.semconv.resource.attributes.ResourceAttributes;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -121,7 +112,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import net.jcip.annotations.ThreadSafe;
@@ -236,9 +227,8 @@ public class DefaultDriverContext implements InternalDriverContext {
   private final LazyReference<Optional<AuthProvider>> authProviderRef;
   private final LazyReference<List<LifecycleListener>> lifecycleListenersRef =
       new LazyReference<>("lifecycleListeners", this::buildLifecycleListeners, cycleDetector);
-
-  private LazyReference<OpenTelemetry> openTelemetry;
-
+  private final LazyReference<OpenTelemetry> openTelemetry;
+  private final ExecutorService openTelemetryNativeTraceExecutor;
   private final DriverConfig config;
   private final DriverConfigLoader configLoader;
   private final ChannelPoolFactory channelPoolFactory = new ChannelPoolFactory();
@@ -319,8 +309,16 @@ public class DefaultDriverContext implements InternalDriverContext {
     }
     this.initStackTrace = stackTrace;
     this.metricRegistry = programmaticArguments.getMetricRegistry();
-    this.openTelemetry = new LazyReference<>("openTelemetry", () -> (programmaticArguments.getOpenTelemetry() != null ? programmaticArguments.getOpenTelemetry() : null)
-            , cycleDetector);
+    this.openTelemetry =
+        new LazyReference<>(
+            "openTelemetry",
+            () ->
+                (programmaticArguments.getOpenTelemetry() != null
+                    ? programmaticArguments.getOpenTelemetry()
+                    : null),
+            cycleDetector);
+    this.openTelemetryNativeTraceExecutor =
+        programmaticArguments.getOpenTelemetryNativeTraceExecutor();
   }
 
   /**
@@ -1055,9 +1053,14 @@ public class DefaultDriverContext implements InternalDriverContext {
   }
 
   @Override
-  @NonNull
+  @Nullable
   public OpenTelemetry getOpenTelemetry() {
     return openTelemetry.get();
   }
 
+  @Override
+  @Nullable
+  public ExecutorService getOpenTelemetryNativeTraceExecutor() {
+    return null;
+  }
 }

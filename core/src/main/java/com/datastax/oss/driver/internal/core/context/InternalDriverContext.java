@@ -48,10 +48,12 @@ import com.datastax.oss.protocol.internal.SegmentCodec;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.netty.buffer.ByteBuf;
+import io.opentelemetry.api.OpenTelemetry;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 
 /** Extends the driver context with additional components that are not exposed by our public API. */
@@ -215,4 +217,10 @@ public interface InternalDriverContext extends DriverContext {
   default Object getMetricRegistry() {
     return null;
   }
+
+  @Nullable
+  OpenTelemetry getOpenTelemetry();
+
+  @Nullable
+  ExecutorService getOpenTelemetryNativeTraceExecutor();
 }

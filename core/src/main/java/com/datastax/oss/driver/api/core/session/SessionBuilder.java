@@ -51,6 +51,7 @@ import com.datastax.oss.driver.internal.core.util.concurrent.BlockingOperation;
 import com.datastax.oss.driver.internal.core.util.concurrent.CompletableFutures;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.opentelemetry.api.OpenTelemetry;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
@@ -66,10 +67,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 import javax.net.ssl.SSLContext;
-
-import io.opentelemetry.api.OpenTelemetry;
 import net.jcip.annotations.NotThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -810,12 +810,19 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   }
 
   /**
-   * The OpenTelemetry instance, containing all configurations for OpenTelemetry.
-   * Currently, it only supports tracing.
+   * The OpenTelemetry instance, containing all configurations for OpenTelemetry. Currently, it only
+   * supports tracing.
    */
   @NonNull
   public SelfT withOpenTelemetry(@NonNull OpenTelemetry openTelemetry) {
     this.programmaticArgumentsBuilder.withOpenTelemetry(openTelemetry);
+    return self;
+  }
+
+  /** */
+  @NonNull
+  public SelfT withOpenTelemetryNativeTraceExecutor(@NonNull ExecutorService executorService) {
+    this.programmaticArgumentsBuilder.withOpenTelemetryNativeTraceExecutor(executorService);
     return self;
   }
 

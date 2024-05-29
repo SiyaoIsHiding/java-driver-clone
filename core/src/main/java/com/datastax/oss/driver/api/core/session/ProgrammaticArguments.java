@@ -35,13 +35,13 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.opentelemetry.api.OpenTelemetry;
-
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 
 /**
@@ -74,7 +74,8 @@ public class ProgrammaticArguments {
   private final MutableCodecRegistry codecRegistry;
   private final Object metricRegistry;
 
-  private OpenTelemetry openTelemetry;
+  private final OpenTelemetry openTelemetry;
+  private final ExecutorService openTelemetryNativeTraceExecutor;
 
   private ProgrammaticArguments(
       @NonNull List<TypeCodec<?>> typeCodecs,
@@ -93,8 +94,8 @@ public class ProgrammaticArguments {
       @Nullable String startupApplicationVersion,
       @Nullable MutableCodecRegistry codecRegistry,
       @Nullable Object metricRegistry,
-      @Nullable OpenTelemetry openTelemetry) {
-
+      @Nullable OpenTelemetry openTelemetry,
+      @Nullable ExecutorService openTelemetryNativeTraceExecutor) {
     this.typeCodecs = typeCodecs;
     this.nodeStateListener = nodeStateListener;
     this.schemaChangeListener = schemaChangeListener;
@@ -112,6 +113,7 @@ public class ProgrammaticArguments {
     this.codecRegistry = codecRegistry;
     this.metricRegistry = metricRegistry;
     this.openTelemetry = openTelemetry;
+    this.openTelemetryNativeTraceExecutor = openTelemetryNativeTraceExecutor;
   }
 
   @NonNull
@@ -201,6 +203,11 @@ public class ProgrammaticArguments {
     return openTelemetry;
   }
 
+  @Nullable
+  public ExecutorService getOpenTelemetryNativeTraceExecutor() {
+    return openTelemetryNativeTraceExecutor;
+  }
+
   public static class Builder {
 
     private final ImmutableList.Builder<TypeCodec<?>> typeCodecsBuilder = ImmutableList.builder();
@@ -223,6 +230,8 @@ public class ProgrammaticArguments {
     private Object metricRegistry;
 
     private OpenTelemetry openTelemetry;
+
+    private ExecutorService openTelemetryNativeTraceExecutor;
 
     @NonNull
     public Builder addTypeCodecs(@NonNull TypeCodec<?>... typeCodecs) {
@@ -430,6 +439,12 @@ public class ProgrammaticArguments {
     }
 
     @NonNull
+    public Builder withOpenTelemetryNativeTraceExecutor(@NonNull ExecutorService executorService) {
+      this.openTelemetryNativeTraceExecutor = executorService;
+      return this;
+    }
+
+    @NonNull
     public ProgrammaticArguments build() {
       return new ProgrammaticArguments(
           typeCodecsBuilder.build(),
@@ -448,7 +463,8 @@ public class ProgrammaticArguments {
           startupApplicationVersion,
           codecRegistry,
           metricRegistry,
-          openTelemetry);
+          openTelemetry,
+          openTelemetryNativeTraceExecutor);
     }
   }
 }

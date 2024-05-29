@@ -29,6 +29,8 @@ import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
+import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.shaded.guava.common.util.concurrent.ThreadFactoryBuilder;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.opentelemetry.api.trace.Span;
@@ -38,18 +40,39 @@ import io.opentelemetry.context.Context;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
+/**
+ * TODO: retry and speculative execution Concerns: 1. It relies on log prefix to identify each
+ * request 2. `ConcurrentHashMap` may lead to memory leak if a request somehow neither succeed nor
+ * fail 3. What should be the default of ExecutorService?
+ */
 public class OtelRequestTracker implements RequestTracker {
 
   private final Map<String, TracingInfo> logPrefixToSpanMap =
       new java.util.concurrent.ConcurrentHashMap<>();
 
   private final Tracer tracer;
+  private final ExecutorService threadPool;
 
-  public OtelRequestTracker(DriverContext context) {
+  public OtelRequestTracker(InternalDriverContext context) {
     this.tracer =
         Objects.requireNonNull(context.getOpenTelemetry())
             .getTracer("com.datastax.oss.driver.internal.core.tracker.OtelRequestTracker");
+    this.threadPool =
+        context.getOpenTelemetryNativeTraceExecutor() != null
+            ? context.getOpenTelemetryNativeTraceExecutor()
+            : new ThreadPoolExecutor(
+                1,
+                Math.max(Runtime.getRuntime().availableProcessors(), 1),
+                10,
+                TimeUnit.SECONDS,
+                new ArrayBlockingQueue<>(1000),
+                new ThreadFactoryBuilder().setNameFormat("otel-thread-%d").build(),
+                new ThreadPoolExecutor.AbortPolicy());
   }
 
   @Override
@@ -73,9 +96,10 @@ public class OtelRequestTracker implements RequestTracker {
   @Override
   public void onRequestSent(
       @NonNull Statement<?> statement, @NonNull Node node, @NonNull String requestLogPrefix) {
-    Span parentSpan = logPrefixToSpanMap.get(requestLogPrefix).getParentSpan();
+    TracingInfo tracingInfo = logPrefixToSpanMap.get(requestLogPrefix);
+    Span parentSpan = tracingInfo.getParentSpan();
     parentSpan.setAttribute("Statement", statementToString(statement));
-    Span createdSpan = logPrefixToSpanMap.get(requestLogPrefix).getCreatedSpan();
+    Span createdSpan = tracingInfo.getCreatedSpan();
     createdSpan.end();
   }
 
@@ -100,8 +124,8 @@ public class OtelRequestTracker implements RequestTracker {
     }
     Span span = tracingInfo.getParentSpan();
     span.recordException(error);
-    span.end();
     span.setStatus(StatusCode.ERROR);
+    span.end();
     logPrefixToSpanMap.remove(requestLogPrefix);
   }
 
@@ -117,8 +141,8 @@ public class OtelRequestTracker implements RequestTracker {
       return;
     }
     Span span = tracingInfo.getParentSpan();
-    span.end();
     span.setStatus(StatusCode.OK);
+    span.end();
     logPrefixToSpanMap.remove(requestLogPrefix);
   }
 
@@ -156,19 +180,18 @@ public class OtelRequestTracker implements RequestTracker {
       return;
     }
     Span span = tracingInfo.getParentSpan();
+    span.setStatus(StatusCode.OK);
     // add cassandra query trace
     if (resultSet.getExecutionInfo().getTracingId() != null) {
-      new Thread(
-              () -> {
-                QueryTrace queryTrace = resultSet.getExecutionInfo().getQueryTrace();
-                addCassandraQueryTraceToSpan(span, queryTrace);
-                span.end();
-              })
-          .start();
+      threadPool.submit(
+          () -> {
+            QueryTrace queryTrace = resultSet.getExecutionInfo().getQueryTrace();
+            addCassandraQueryTraceToSpan(span, queryTrace);
+            span.end();
+          });
     } else {
       span.end();
     }
-    span.setStatus(StatusCode.OK);
     logPrefixToSpanMap.remove(requestLogPrefix);
   }
 
