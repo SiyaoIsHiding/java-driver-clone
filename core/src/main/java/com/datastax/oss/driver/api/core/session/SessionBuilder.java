@@ -68,6 +68,8 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Predicate;
 import javax.net.ssl.SSLContext;
+
+import io.opentelemetry.api.OpenTelemetry;
 import net.jcip.annotations.NotThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -804,6 +806,16 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
   @NonNull
   public SelfT withMetricRegistry(@Nullable Object metricRegistry) {
     this.programmaticArgumentsBuilder.withMetricRegistry(metricRegistry);
+    return self;
+  }
+
+  /**
+   * The OpenTelemetry instance, containing all configurations for OpenTelemetry.
+   * Currently, it only supports tracing.
+   */
+  @NonNull
+  public SelfT withOpenTelemetry(@NonNull OpenTelemetry openTelemetry) {
+    this.programmaticArgumentsBuilder.withOpenTelemetry(openTelemetry);
     return self;
   }
 

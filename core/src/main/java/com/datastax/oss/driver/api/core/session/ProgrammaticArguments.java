@@ -34,6 +34,8 @@ import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableList;
 import com.datastax.oss.driver.shaded.guava.common.collect.ImmutableMap;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.opentelemetry.api.OpenTelemetry;
+
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
@@ -72,6 +74,8 @@ public class ProgrammaticArguments {
   private final MutableCodecRegistry codecRegistry;
   private final Object metricRegistry;
 
+  private OpenTelemetry openTelemetry;
+
   private ProgrammaticArguments(
       @NonNull List<TypeCodec<?>> typeCodecs,
       @Nullable NodeStateListener nodeStateListener,
@@ -88,7 +92,8 @@ public class ProgrammaticArguments {
       @Nullable String startupApplicationName,
       @Nullable String startupApplicationVersion,
       @Nullable MutableCodecRegistry codecRegistry,
-      @Nullable Object metricRegistry) {
+      @Nullable Object metricRegistry,
+      @Nullable OpenTelemetry openTelemetry) {
 
     this.typeCodecs = typeCodecs;
     this.nodeStateListener = nodeStateListener;
@@ -106,6 +111,7 @@ public class ProgrammaticArguments {
     this.startupApplicationVersion = startupApplicationVersion;
     this.codecRegistry = codecRegistry;
     this.metricRegistry = metricRegistry;
+    this.openTelemetry = openTelemetry;
   }
 
   @NonNull
@@ -190,6 +196,11 @@ public class ProgrammaticArguments {
     return metricRegistry;
   }
 
+  @Nullable
+  public OpenTelemetry getOpenTelemetry() {
+    return openTelemetry;
+  }
+
   public static class Builder {
 
     private final ImmutableList.Builder<TypeCodec<?>> typeCodecsBuilder = ImmutableList.builder();
@@ -210,6 +221,8 @@ public class ProgrammaticArguments {
     private String startupApplicationVersion;
     private MutableCodecRegistry codecRegistry;
     private Object metricRegistry;
+
+    private OpenTelemetry openTelemetry;
 
     @NonNull
     public Builder addTypeCodecs(@NonNull TypeCodec<?>... typeCodecs) {
@@ -411,6 +424,12 @@ public class ProgrammaticArguments {
     }
 
     @NonNull
+    public Builder withOpenTelemetry(@NonNull OpenTelemetry openTelemetry) {
+      this.openTelemetry = openTelemetry;
+      return this;
+    }
+
+    @NonNull
     public ProgrammaticArguments build() {
       return new ProgrammaticArguments(
           typeCodecsBuilder.build(),
@@ -428,7 +447,8 @@ public class ProgrammaticArguments {
           startupApplicationName,
           startupApplicationVersion,
           codecRegistry,
-          metricRegistry);
+          metricRegistry,
+          openTelemetry);
     }
   }
 }
