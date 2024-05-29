@@ -1061,6 +1061,6 @@ public class DefaultDriverContext implements InternalDriverContext {
   @Override
   @Nullable
   public ExecutorService getOpenTelemetryNativeTraceExecutor() {
-    return null;
+    return openTelemetryNativeTraceExecutor;
   }
 }
