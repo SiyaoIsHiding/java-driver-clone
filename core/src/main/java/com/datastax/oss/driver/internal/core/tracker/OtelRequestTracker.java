@@ -33,6 +33,7 @@ import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.shaded.guava.common.util.concurrent.ThreadFactoryBuilder;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
+import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
@@ -46,9 +47,19 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * TODO: retry and speculative execution Concerns: 1. It relies on log prefix to identify each
+ * TODO: retry and speculative execution
+ * Concerns: 1. It relies on log prefix to identify each
  * request 2. `ConcurrentHashMap` may lead to memory leak if a request somehow neither succeed nor
  * fail 3. What should be the default of ExecutorService?
+ *
+ * Specify the following in your application.conf:
+ * <pre>
+ * datastax-java-driver.advanced.request-tracker {
+ *   class = OtelRequestTracker
+ * }
+ * </pre>
+ * You have to pass in an OpenTelemetry instance to use OtelRequestTracker
+ * You can optionally pass in an ExecutorService instance to
  */
 public class OtelRequestTracker implements RequestTracker {
 
@@ -58,13 +69,18 @@ public class OtelRequestTracker implements RequestTracker {
   private final Tracer tracer;
   private final ExecutorService threadPool;
 
-  public OtelRequestTracker(InternalDriverContext context) {
+  public OtelRequestTracker(DriverContext context) {
+    InternalDriverContext internalContext = (InternalDriverContext) context;
+    OpenTelemetry openTelemetry = internalContext.getOpenTelemetry();
+    if (openTelemetry == null) {
+      throw new IllegalStateException("You have to pass in an OpenTelemetry instance to use OtelRequestTracker");
+    }
     this.tracer =
-        Objects.requireNonNull(context.getOpenTelemetry())
+        Objects.requireNonNull(internalContext.getOpenTelemetry())
             .getTracer("com.datastax.oss.driver.internal.core.tracker.OtelRequestTracker");
     this.threadPool =
-        context.getOpenTelemetryNativeTraceExecutor() != null
-            ? context.getOpenTelemetryNativeTraceExecutor()
+        internalContext.getOpenTelemetryNativeTraceExecutor() != null
+            ? internalContext.getOpenTelemetryNativeTraceExecutor()
             : new ThreadPoolExecutor(
                 1,
                 Math.max(Runtime.getRuntime().availableProcessors(), 1),
