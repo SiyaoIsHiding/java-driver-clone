@@ -23,17 +23,22 @@ import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
 import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BatchableStatement;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
+import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import com.datastax.oss.driver.api.core.cql.QueryTrace;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
+import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.shaded.guava.common.util.concurrent.ThreadFactoryBuilder;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributesBuilder;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
@@ -47,19 +52,29 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * TODO: retry and speculative execution
- * Concerns: 1. It relies on log prefix to identify each
- * request 2. `ConcurrentHashMap` may lead to memory leak if a request somehow neither succeed nor
- * fail 3. What should be the default of ExecutorService?
+ * <p>
+ * TODO:
+ * 1. retry
+ * 2. speculative execution
+ * 3. semantic conventions
+ * Concerns:
+ * 1. It relies on log prefix to identify each
+ * request
+ * 2. `ConcurrentHashMap` may lead to memory leak if a request somehow neither succeed nor
+ * fail
+ * 3. What should be the default of ExecutorService?
+ * 4. `logPrefixToSpanMap` is not thread-safe and is it fine?
+ *</p>
+ * <p>Specify the following in your {@code application.conf} to enable OpenTelemetry for tracing:
  *
- * Specify the following in your application.conf:
  * <pre>
  * datastax-java-driver.advanced.request-tracker {
  *   class = OtelRequestTracker
  * }
- * </pre>
- * You have to pass in an OpenTelemetry instance to use OtelRequestTracker
- * You can optionally pass in an ExecutorService instance to
+ * </pre></p>
+ *
+ * You have to pass in an OpenTelemetry instance to use OtelRequestTracker. You can optionally pass
+ * in an ExecutorService instance to use for fetching Cassandra native query trace.
  */
 public class OtelRequestTracker implements RequestTracker {
 
@@ -69,18 +84,34 @@ public class OtelRequestTracker implements RequestTracker {
   private final Tracer tracer;
   private final ExecutorService threadPool;
 
+  private final DefaultDriverContext context;
+
+  private static final AttributeKey<String> DB_CASSANDRA_CONSISTENCY_LEVEL =
+          AttributeKey.stringKey("db.cassandra.consistency_level");
+  private static final AttributeKey<String> DB_CASSANDRA_COORDINATOR_DC =
+          AttributeKey.stringKey("db.cassandra.coordinator.dc");
+  private static final AttributeKey<String> DB_CASSANDRA_COORDINATOR_ID =
+          AttributeKey.stringKey("db.cassandra.coordinator.id");
+  private static final AttributeKey<Boolean> DB_CASSANDRA_IDEMPOTENCE =
+          AttributeKey.booleanKey("db.cassandra.idempotence");
+  private static final AttributeKey<Long> DB_CASSANDRA_PAGE_SIZE =
+          AttributeKey.longKey("db.cassandra.page_size");
+  private static final AttributeKey<Long> DB_CASSANDRA_SPECULATIVE_EXECUTION_COUNT =
+          AttributeKey.longKey("db.cassandra.speculative_execution_count");
+
   public OtelRequestTracker(DriverContext context) {
-    InternalDriverContext internalContext = (InternalDriverContext) context;
-    OpenTelemetry openTelemetry = internalContext.getOpenTelemetry();
+    this.context = (DefaultDriverContext) context;
+    OpenTelemetry openTelemetry = this.context.getOpenTelemetry();
     if (openTelemetry == null) {
-      throw new IllegalStateException("You have to pass in an OpenTelemetry instance to use OtelRequestTracker");
+      throw new IllegalStateException(
+          "You have to pass in an OpenTelemetry instance to use OtelRequestTracker");
     }
     this.tracer =
-        Objects.requireNonNull(internalContext.getOpenTelemetry())
+        Objects.requireNonNull(this.context.getOpenTelemetry())
             .getTracer("com.datastax.oss.driver.internal.core.tracker.OtelRequestTracker");
     this.threadPool =
-        internalContext.getOpenTelemetryNativeTraceExecutor() != null
-            ? internalContext.getOpenTelemetryNativeTraceExecutor()
+        this.context.getOpenTelemetryNativeTraceExecutor() != null
+            ? this.context.getOpenTelemetryNativeTraceExecutor()
             : new ThreadPoolExecutor(
                 1,
                 Math.max(Runtime.getRuntime().availableProcessors(), 1),
@@ -97,7 +128,7 @@ public class OtelRequestTracker implements RequestTracker {
     Span parentSpan = tracer.spanBuilder("Cassandra Java Driver").startSpan();
     parentSpan.addEvent("Request handler created");
     parentSpan.setAttribute("Session name", context.getSessionName());
-    parentSpan.setAttribute("CqlRequestHandler hashcode", requestLogPrefix);
+    parentSpan.setAttribute("CqlRequestHandler hashcode", requestLogPrefix.split("\\|")[1]);
     Span createdSpan =
         tracer
             .spanBuilder("Driver Processing Request")
@@ -249,6 +280,10 @@ public class OtelRequestTracker implements RequestTracker {
         Instant.ofEpochMilli(queryTrace.getStartedAt() + queryTrace.getDurationMicros() / 1000));
   }
 
+//  private AttributesBuilder gatherAttributes(Statement statement, ExecutionInfo executionInfo){
+//    AttributesBuilder builder = Attributes.builder();
+//    builder.put(DB_CASSANDRA_CONSISTENCY_LEVEL, statement.getConsistencyLevel().name());
+//  }
   private static class TracingInfo {
     private Span parentSpan;
     private Span createdSpan; // the span from handler created to request sent
