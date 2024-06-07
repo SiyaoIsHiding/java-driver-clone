@@ -17,6 +17,7 @@
  */
 package com.datastax.oss.driver.internal.core.tracker;
 
+import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
 import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
@@ -27,11 +28,14 @@ import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import com.datastax.oss.driver.api.core.cql.QueryTrace;
 import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
+import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
 import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
+import com.datastax.oss.driver.internal.core.metadata.SniEndPoint;
 import com.datastax.oss.driver.shaded.guava.common.util.concurrent.ThreadFactoryBuilder;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -43,6 +47,9 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
+//import io.opentelemetry.semconv.ServerAttributes;
+
+import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
@@ -86,6 +93,8 @@ public class OtelRequestTracker implements RequestTracker {
 
   private final DefaultDriverContext context;
 
+  private final RequestLogFormatter formatter;
+
   private static final AttributeKey<String> DB_CASSANDRA_CONSISTENCY_LEVEL =
           AttributeKey.stringKey("db.cassandra.consistency_level");
   private static final AttributeKey<String> DB_CASSANDRA_COORDINATOR_DC =
@@ -120,6 +129,7 @@ public class OtelRequestTracker implements RequestTracker {
                 new ArrayBlockingQueue<>(1000),
                 new ThreadFactoryBuilder().setNameFormat("otel-thread-%d").build(),
                 new ThreadPoolExecutor.AbortPolicy());
+    this.formatter = this.context.getRequestLogFormatter();
   }
 
   @Override
@@ -162,9 +172,10 @@ public class OtelRequestTracker implements RequestTracker {
       long latencyNanos,
       @NonNull DriverExecutionProfile executionProfile,
       @NonNull Node node,
-      @NonNull String requestLogPrefix) {
+      @NonNull String requestLogPrefix,
+      @Nullable ExecutionInfo executionInfo) {
     RequestTracker.super.onNodeError(
-        request, error, latencyNanos, executionProfile, node, requestLogPrefix);
+        request, error, latencyNanos, executionProfile, node, requestLogPrefix, executionInfo);
     TracingInfo tracingInfo = logPrefixToSpanMap.get(requestLogPrefix);
     if (tracingInfo == null) {
       return;
@@ -182,7 +193,8 @@ public class OtelRequestTracker implements RequestTracker {
       long latencyNanos,
       @NonNull DriverExecutionProfile executionProfile,
       @NonNull Node node,
-      @NonNull String requestLogPrefix) {
+      @NonNull String requestLogPrefix,
+      @Nullable ExecutionInfo executionInfo) {
     TracingInfo tracingInfo = logPrefixToSpanMap.get(requestLogPrefix);
     if (tracingInfo == null) {
       return;
@@ -200,7 +212,8 @@ public class OtelRequestTracker implements RequestTracker {
       long latencyNanos,
       @NonNull DriverExecutionProfile executionProfile,
       @Nullable Node node,
-      @NonNull String requestLogPrefix) {
+      @NonNull String requestLogPrefix,
+      @Nullable ExecutionInfo executionInfo) {
     TracingInfo tracingInfo = logPrefixToSpanMap.get(requestLogPrefix);
     if (tracingInfo == null) {
       return;
@@ -219,9 +232,9 @@ public class OtelRequestTracker implements RequestTracker {
       @NonNull DriverExecutionProfile executionProfile,
       @NonNull Node node,
       @NonNull String requestLogPrefix,
-      @NonNull AsyncResultSet resultSet) {
+      @NonNull ExecutionInfo executionInfo) {
     RequestTracker.super.onNodeSuccess(
-        request, latencyNanos, executionProfile, node, requestLogPrefix);
+        request, latencyNanos, executionProfile, node, requestLogPrefix, executionInfo);
     TracingInfo tracingInfo = logPrefixToSpanMap.get(requestLogPrefix);
     if (tracingInfo == null) {
       return;
@@ -229,10 +242,10 @@ public class OtelRequestTracker implements RequestTracker {
     Span span = tracingInfo.getParentSpan();
     span.setStatus(StatusCode.OK);
     // add cassandra query trace
-    if (resultSet.getExecutionInfo().getTracingId() != null) {
+    if (executionInfo.getTracingId() != null) {
       threadPool.submit(
           () -> {
-            QueryTrace queryTrace = resultSet.getExecutionInfo().getQueryTrace();
+            QueryTrace queryTrace = executionInfo.getQueryTrace();
             addCassandraQueryTraceToSpan(span, queryTrace);
             span.end();
           });
@@ -242,22 +255,11 @@ public class OtelRequestTracker implements RequestTracker {
     logPrefixToSpanMap.remove(requestLogPrefix);
   }
 
-  private static String statementToString(Statement<?> statement) {
-    if (statement instanceof BoundStatement) {
-      return ((BoundStatement) statement).getPreparedStatement().toString();
-    } else if (statement instanceof SimpleStatement) {
-      return ((SimpleStatement) statement).getQuery();
-    } else if (statement instanceof BatchStatement) {
-      StringBuilder builder = new StringBuilder();
-      BatchStatement batchStatement = (BatchStatement) statement;
-      for (BatchableStatement<?> inner : batchStatement) {
-        builder.append(statementToString(inner)).append(";\n");
-      }
-      return builder.toString();
-    } else {
-      // dead code
-      return statement.toString();
-    }
+  private String statementToString(Request request) {
+    StringBuilder builder = new StringBuilder();
+    this.formatter.appendQueryString(request, RequestLogger.DEFAULT_REQUEST_LOGGER_MAX_QUERY_LENGTH, builder);
+    this.formatter.appendValues(request, RequestLogger.DEFAULT_REQUEST_LOGGER_MAX_VALUES, RequestLogger.DEFAULT_REQUEST_LOGGER_MAX_VALUE_LENGTH, true, builder);
+    return builder.toString();
   }
 
   private void addCassandraQueryTraceToSpan(Span parentSpan, QueryTrace queryTrace) {
@@ -280,10 +282,47 @@ public class OtelRequestTracker implements RequestTracker {
         Instant.ofEpochMilli(queryTrace.getStartedAt() + queryTrace.getDurationMicros() / 1000));
   }
 
-//  private AttributesBuilder gatherAttributes(Statement statement, ExecutionInfo executionInfo){
-//    AttributesBuilder builder = Attributes.builder();
-//    builder.put(DB_CASSANDRA_CONSISTENCY_LEVEL, statement.getConsistencyLevel().name());
-//  }
+  private AttributesBuilder gatherAttributes(Statement<?> statement, ExecutionInfo executionInfo){
+    AttributesBuilder builder = Attributes.builder();
+    String consistencyLevel;
+    DriverExecutionProfile config = this.context.getConfig().getDefaultProfile();
+    if (statement.getConsistencyLevel() != null) {
+      consistencyLevel = statement.getConsistencyLevel().name();
+    } else {
+      consistencyLevel = config.getString(DefaultDriverOption.REQUEST_CONSISTENCY);
+    }
+    builder.put(DB_CASSANDRA_CONSISTENCY_LEVEL, consistencyLevel);
+
+    Node coordinator = executionInfo.getCoordinator();
+
+    return builder;
+  }
+
+  private static void updateServerAddressAndPort(AttributesBuilder attributes, Node coordinator) {
+    EndPoint endPoint = coordinator.getEndPoint();
+    if (endPoint instanceof DefaultEndPoint) {
+      InetSocketAddress address = ((DefaultEndPoint) endPoint).resolve();
+      attributes.put(ServerAttributes.SERVER_ADDRESS, address.getHostString());
+      attributes.put(ServerAttributes.SERVER_PORT, address.getPort());
+    } else if (endPoint instanceof SniEndPoint && proxyAddressField != null) {
+      SniEndPoint sniEndPoint = (SniEndPoint) endPoint;
+      Object object = null;
+      try {
+        object = proxyAddressField.get(sniEndPoint);
+      } catch (Exception e) {
+        logger.log(
+                Level.FINE,
+                "Error when accessing the private field proxyAddress of SniEndPoint using reflection.",
+                e);
+      }
+      if (object instanceof InetSocketAddress) {
+        InetSocketAddress address = (InetSocketAddress) object;
+        attributes.put(ServerAttributes.SERVER_ADDRESS, address.getHostString());
+        attributes.put(ServerAttributes.SERVER_PORT, address.getPort());
+      }
+    }
+  }
+
   private static class TracingInfo {
     private Span parentSpan;
     private Span createdSpan; // the span from handler created to request sent
