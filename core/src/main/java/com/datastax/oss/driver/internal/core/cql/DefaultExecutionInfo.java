@@ -231,7 +231,7 @@ public class DefaultExecutionInfo implements ExecutionInfo {
     private Frame frame;
     private boolean schemaInAgreement = true;
 
-    public Builder(
+    private Builder(
         Request request,
         Node coordinator,
         int speculativeExecutionCount,

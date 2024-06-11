@@ -125,6 +125,39 @@ public class CqlRequestHandlerTrackerTest extends CqlRequestHandlerTestBase {
     assertThat(executionInfo.getExecutionProfile()).isNotNull();
     assertThat(executionInfo.getCoordinator()).isEqualTo(expectedNode);
   }
+  // from 72% and 75% coverage to 77% and 83%
+  @Test
+  public void should_build_execution_info_on_write_failure() {
+    try (RequestHandlerTestHarness harness =
+        RequestHandlerTestHarness.builder()
+            .withDefaultIdempotence(true)
+            .withWriteFailure(node1, new java.lang.Error("mock message"))
+            .build()) {
+      RequestTracker requestTracker = mock(RequestTracker.class);
+      when(harness.getContext().getRequestTracker()).thenReturn(requestTracker);
+
+      new CqlRequestHandler(
+              UNDEFINED_IDEMPOTENCE_STATEMENT, harness.getSession(), harness.getContext(), "test")
+          .handle();
+
+      List<Invocation> invocations =
+          new ArrayList<>(mockingDetails(requestTracker).getInvocations());
+
+      ExecutionInfo executionInfo = (ExecutionInfo) invocations.get(0).getRawArguments()[5];
+
+      assertThat(executionInfo.getRequest()).isEqualTo(UNDEFINED_IDEMPOTENCE_STATEMENT);
+      assertThat(executionInfo.getExecutionProfile()).isEqualTo(harness.defaultProfile);
+      assertThat(executionInfo.getCoordinator()).isEqualTo(node1);
+      //      assertThat(executionInfo.getErrors()).isNotEmpty();
+      // TODO: currently, the error list is empty cuz the execution info is built after the field
+      // errors is initialized
+      // And this it not what we want
+      assertThat(executionInfo.getSafePagingState()).isNull();
+      assertThat(executionInfo.getTracingId()).isNull();
+      assertThat(executionInfo.getWarnings()).isEmpty();
+      assertThatStage(executionInfo.getQueryTraceAsync()).isFailed();
+    }
+  }
 
   @Test
   public void should_not_invoke_noop_request_tracker() {

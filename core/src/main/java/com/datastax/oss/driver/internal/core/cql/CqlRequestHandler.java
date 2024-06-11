@@ -205,19 +205,7 @@ public class CqlRequestHandler implements Throttled {
       try {
         return this.timer.newTimeout(
             (Timeout timeout1) -> {
-              DriverExecutionProfile executionProfile =
-                  Conversions.resolveExecutionProfile(initialStatement, context);
-              ExecutionInfo executionInfo =
-                  new DefaultExecutionInfo.Builder(
-                          initialStatement,
-                          null,
-                          startedSpeculativeExecutionsCount.get(),
-                          -1,
-                          errors,
-                          session,
-                          context,
-                          executionProfile)
-                      .build();
+              ExecutionInfo executionInfo = clientErrorExecutionInfo(initialStatement).build();
               setFinalError(
                   executionInfo,
                   new DriverTimeoutException("Query timed out after " + timeoutDuration));
@@ -274,19 +262,7 @@ public class CqlRequestHandler implements Throttled {
       // We've reached the end of the query plan without finding any node to write to
       if (!result.isDone() && activeExecutionsCount.decrementAndGet() == 0) {
         // We're the last execution so fail the result
-        DriverExecutionProfile executionProfile =
-            Conversions.resolveExecutionProfile(statement, context);
-        ExecutionInfo executionInfo =
-            new DefaultExecutionInfo.Builder(
-                    statement,
-                    null,
-                    startedSpeculativeExecutionsCount.get(),
-                    -1, // we did not send the request successfully even once
-                    errors,
-                    session,
-                    context,
-                    executionProfile)
-                .build();
+        ExecutionInfo executionInfo = clientErrorExecutionInfo(statement).build();
         setFinalError(executionInfo, AllNodesFailedException.fromErrors(this.errors));
       }
     } else {
@@ -436,17 +412,7 @@ public class CqlRequestHandler implements Throttled {
         Conversions.resolveExecutionProfile(initialStatement, context);
     sessionMetricUpdater.incrementCounter(
         DefaultSessionMetric.THROTTLING_ERRORS, executionProfile.getName());
-    ExecutionInfo executionInfo =
-        new DefaultExecutionInfo.Builder(
-                initialStatement,
-                null,
-                startedSpeculativeExecutionsCount.get(),
-                -1, // we did not succeed in sending the request
-                errors,
-                session,
-                context,
-                executionProfile)
-            .build();
+    ExecutionInfo executionInfo = clientErrorExecutionInfo(initialStatement).build();
     setFinalError(executionInfo, error);
   }
 
@@ -528,6 +494,11 @@ public class CqlRequestHandler implements Throttled {
         Throwable error = future.cause();
         // TODO: Can we move DriverExecutionProfile inside the defaultExecutionInfo()?
         // TODO: If we allow, this call also can be refactored to defaultExecutionInfo().
+        // As the execution profile is final for a statement, and CqlRequestHandler has a final
+        // field initialStatement
+        // And NodeResponseCallback has a final field statement, we should be able to only resolve
+        // execution profile once for each instance of
+        // NodeResponseCallback and CqlRequestHandler in their constructors
         DriverExecutionProfile executionProfile =
             Conversions.resolveExecutionProfile(statement, context);
         ExecutionInfo executionInfo =
@@ -1005,7 +976,7 @@ public class CqlRequestHandler implements Throttled {
 
   private DefaultExecutionInfo.Builder defaultExecutionInfo(
       NodeResponseCallback callback, int execution) {
-    return new DefaultExecutionInfo.Builder(
+    return DefaultExecutionInfo.builder(
         callback.statement,
         callback.node,
         startedSpeculativeExecutionsCount.get(),
@@ -1014,5 +985,17 @@ public class CqlRequestHandler implements Throttled {
         session,
         context,
         callback.executionProfile);
+  }
+
+  private DefaultExecutionInfo.Builder clientErrorExecutionInfo(Statement<?> statement) {
+    return DefaultExecutionInfo.builder(
+        statement,
+        null,
+        startedSpeculativeExecutionsCount.get(),
+        -1,
+        errors,
+        session,
+        context,
+        Conversions.resolveExecutionProfile(statement, context));
   }
 }
