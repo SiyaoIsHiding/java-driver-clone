@@ -492,13 +492,6 @@ public class CqlRequestHandler implements Throttled {
     public void operationComplete(Future<java.lang.Void> future) throws Exception {
       if (!future.isSuccess()) {
         Throwable error = future.cause();
-        // TODO: Can we move DriverExecutionProfile inside the defaultExecutionInfo()?
-        // TODO: If we allow, this call also can be refactored to defaultExecutionInfo().
-        // As the execution profile is final for a statement, and CqlRequestHandler has a final
-        // field initialStatement
-        // And NodeResponseCallback has a final field statement, we should be able to only resolve
-        // execution profile once for each instance of
-        // NodeResponseCallback and CqlRequestHandler in their constructors
         DriverExecutionProfile executionProfile =
             Conversions.resolveExecutionProfile(statement, context);
         ExecutionInfo executionInfo =
@@ -745,7 +738,7 @@ public class CqlRequestHandler implements Throttled {
                           illegalStateException, executionInfo, NANOTIME_NOT_MEASURED_YET);
                       setFinalError(executionInfo, illegalStateException);
                     }
-                    LOG.trace("[{}] Reprepare sucessful, retrying", logPrefix);
+                    LOG.trace("[{}] Reprepare successful, retrying", logPrefix);
                     sendRequest(statement, node, queryPlan, execution, retryCount, false);
                   }
                   return null;

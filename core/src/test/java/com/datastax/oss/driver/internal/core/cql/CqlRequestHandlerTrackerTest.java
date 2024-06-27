@@ -47,6 +47,7 @@ import org.junit.Test;
 import org.mockito.invocation.Invocation;
 
 public class CqlRequestHandlerTrackerTest extends CqlRequestHandlerTestBase {
+
   @Test
   public void should_invoke_request_tracker() {
     try (RequestHandlerTestHarness harness =
@@ -125,7 +126,7 @@ public class CqlRequestHandlerTrackerTest extends CqlRequestHandlerTestBase {
     assertThat(executionInfo.getExecutionProfile()).isNotNull();
     assertThat(executionInfo.getCoordinator()).isEqualTo(expectedNode);
   }
-  // from 72% and 75% coverage to 77% and 83%
+
   @Test
   public void should_build_execution_info_on_write_failure() {
     try (RequestHandlerTestHarness harness =
@@ -148,10 +149,7 @@ public class CqlRequestHandlerTrackerTest extends CqlRequestHandlerTestBase {
       assertThat(executionInfo.getRequest()).isEqualTo(UNDEFINED_IDEMPOTENCE_STATEMENT);
       assertThat(executionInfo.getExecutionProfile()).isEqualTo(harness.defaultProfile);
       assertThat(executionInfo.getCoordinator()).isEqualTo(node1);
-      //      assertThat(executionInfo.getErrors()).isNotEmpty();
-      // TODO: currently, the error list is empty cuz the execution info is built after the field
-      // errors is initialized
-      // And this it not what we want
+      assertThat(executionInfo.getErrors()).isEmpty();
       assertThat(executionInfo.getSafePagingState()).isNull();
       assertThat(executionInfo.getTracingId()).isNull();
       assertThat(executionInfo.getWarnings()).isEmpty();
