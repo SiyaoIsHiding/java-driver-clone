@@ -19,9 +19,8 @@ package com.datastax.oss.driver.api.core.tracker;
 
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
-import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
-import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
+import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.session.Session;

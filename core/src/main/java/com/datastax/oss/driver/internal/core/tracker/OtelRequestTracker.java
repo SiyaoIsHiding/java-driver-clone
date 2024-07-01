@@ -20,22 +20,18 @@ package com.datastax.oss.driver.internal.core.tracker;
 import com.datastax.oss.driver.api.core.config.DefaultDriverOption;
 import com.datastax.oss.driver.api.core.config.DriverExecutionProfile;
 import com.datastax.oss.driver.api.core.context.DriverContext;
-import com.datastax.oss.driver.api.core.cql.AsyncResultSet;
-import com.datastax.oss.driver.api.core.cql.BatchStatement;
-import com.datastax.oss.driver.api.core.cql.BatchableStatement;
-import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.ExecutionInfo;
 import com.datastax.oss.driver.api.core.cql.QueryTrace;
-import com.datastax.oss.driver.api.core.cql.SimpleStatement;
 import com.datastax.oss.driver.api.core.cql.Statement;
 import com.datastax.oss.driver.api.core.metadata.EndPoint;
 import com.datastax.oss.driver.api.core.metadata.Node;
 import com.datastax.oss.driver.api.core.session.Request;
 import com.datastax.oss.driver.api.core.tracker.RequestTracker;
 import com.datastax.oss.driver.internal.core.context.DefaultDriverContext;
-import com.datastax.oss.driver.internal.core.context.InternalDriverContext;
 import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
 import com.datastax.oss.driver.internal.core.metadata.SniEndPoint;
+import com.datastax.oss.driver.shaded.guava.common.base.Splitter;
+import com.datastax.oss.driver.shaded.guava.common.collect.Iterables;
 import com.datastax.oss.driver.shaded.guava.common.util.concurrent.ThreadFactoryBuilder;
 import edu.umd.cs.findbugs.annotations.NonNull;
 import edu.umd.cs.findbugs.annotations.Nullable;
@@ -47,8 +43,8 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.api.trace.Tracer;
 import io.opentelemetry.context.Context;
-//import io.opentelemetry.semconv.ServerAttributes;
-
+import io.opentelemetry.semconv.ServerAttributes;
+import java.lang.reflect.Field;
 import java.net.InetSocketAddress;
 import java.time.Instant;
 import java.util.Map;
@@ -57,31 +53,29 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * <p>
- * TODO:
- * 1. retry
- * 2. speculative execution
- * 3. semantic conventions
- * Concerns:
- * 1. It relies on log prefix to identify each
- * request
- * 2. `ConcurrentHashMap` may lead to memory leak if a request somehow neither succeed nor
- * fail
- * 3. What should be the default of ExecutorService?
- * 4. `logPrefixToSpanMap` is not thread-safe and is it fine?
- *</p>
+ * TODO: 1. retry 2. speculative execution 3. semantic conventions Concerns: 1. It relies on log
+ * prefix to identify each request 2. `ConcurrentHashMap` may lead to memory leak if a request
+ * somehow neither succeed nor fail 3. What should be the default of ExecutorService? 4.
+ * `logPrefixToSpanMap` is not thread-safe and is it fine?
+ *
  * <p>Specify the following in your {@code application.conf} to enable OpenTelemetry for tracing:
  *
  * <pre>
  * datastax-java-driver.advanced.request-tracker {
  *   class = OtelRequestTracker
  * }
- * </pre></p>
+ * </pre>
  *
- * You have to pass in an OpenTelemetry instance to use OtelRequestTracker. You can optionally pass
- * in an ExecutorService instance to use for fetching Cassandra native query trace.
+ * <p>You have to pass in an OpenTelemetry instance to use OtelRequestTracker. You can optionally
+ * pass in an ExecutorService instance to use for fetching Cassandra native query trace.
+ *
+ * <p>Some code snippets are taken from the <a
+ * href="https://github.com/open-telemetry/opentelemetry-java-instrumentation/blob/main/instrumentation/cassandra/cassandra-4.4/library/src/main/java/io/opentelemetry/instrumentation/cassandra/v4_4/CassandraAttributesExtractor.java">OpenTelemetry
+ * Java Instrumentation project</a>
  */
 public class OtelRequestTracker implements RequestTracker {
 
@@ -95,18 +89,22 @@ public class OtelRequestTracker implements RequestTracker {
 
   private final RequestLogFormatter formatter;
 
+  private final Logger LOG = LoggerFactory.getLogger(OtelRequestTracker.class);
+
+  private final Field proxyAddressField = getProxyAddressField();
+
   private static final AttributeKey<String> DB_CASSANDRA_CONSISTENCY_LEVEL =
-          AttributeKey.stringKey("db.cassandra.consistency_level");
+      AttributeKey.stringKey("db.cassandra.consistency_level");
   private static final AttributeKey<String> DB_CASSANDRA_COORDINATOR_DC =
-          AttributeKey.stringKey("db.cassandra.coordinator.dc");
+      AttributeKey.stringKey("db.cassandra.coordinator.dc");
   private static final AttributeKey<String> DB_CASSANDRA_COORDINATOR_ID =
-          AttributeKey.stringKey("db.cassandra.coordinator.id");
+      AttributeKey.stringKey("db.cassandra.coordinator.id");
   private static final AttributeKey<Boolean> DB_CASSANDRA_IDEMPOTENCE =
-          AttributeKey.booleanKey("db.cassandra.idempotence");
+      AttributeKey.booleanKey("db.cassandra.idempotence");
   private static final AttributeKey<Long> DB_CASSANDRA_PAGE_SIZE =
-          AttributeKey.longKey("db.cassandra.page_size");
+      AttributeKey.longKey("db.cassandra.page_size");
   private static final AttributeKey<Long> DB_CASSANDRA_SPECULATIVE_EXECUTION_COUNT =
-          AttributeKey.longKey("db.cassandra.speculative_execution_count");
+      AttributeKey.longKey("db.cassandra.speculative_execution_count");
 
   public OtelRequestTracker(DriverContext context) {
     this.context = (DefaultDriverContext) context;
@@ -138,7 +136,8 @@ public class OtelRequestTracker implements RequestTracker {
     Span parentSpan = tracer.spanBuilder("Cassandra Java Driver").startSpan();
     parentSpan.addEvent("Request handler created");
     parentSpan.setAttribute("Session name", context.getSessionName());
-    parentSpan.setAttribute("CqlRequestHandler hashcode", requestLogPrefix.split("\\|")[1]);
+    parentSpan.setAttribute(
+        "CqlRequestHandler hashcode", Iterables.get(Splitter.on('|').split(requestLogPrefix), 1));
     Span createdSpan =
         tracer
             .spanBuilder("Driver Processing Request")
@@ -153,11 +152,15 @@ public class OtelRequestTracker implements RequestTracker {
   @Override
   public void onRequestSent(
       @NonNull Statement<?> statement, @NonNull Node node, @NonNull String requestLogPrefix) {
-    TracingInfo tracingInfo = logPrefixToSpanMap.get(requestLogPrefix);
-    Span parentSpan = tracingInfo.getParentSpan();
-    parentSpan.setAttribute("Statement", statementToString(statement));
-    Span createdSpan = tracingInfo.getCreatedSpan();
-    createdSpan.end();
+    logPrefixToSpanMap.computeIfPresent(
+        requestLogPrefix,
+        (k, tracingInfo) -> {
+          Span parentSpan = tracingInfo.getParentSpan();
+          parentSpan.setAttribute("Statement", statementToString(statement));
+          Span createdSpan = tracingInfo.getCreatedSpan();
+          createdSpan.end();
+          return tracingInfo;
+        });
   }
 
   @Override
@@ -174,17 +177,15 @@ public class OtelRequestTracker implements RequestTracker {
       @NonNull Node node,
       @NonNull String requestLogPrefix,
       @Nullable ExecutionInfo executionInfo) {
-    RequestTracker.super.onNodeError(
-        request, error, latencyNanos, executionProfile, node, requestLogPrefix, executionInfo);
-    TracingInfo tracingInfo = logPrefixToSpanMap.get(requestLogPrefix);
-    if (tracingInfo == null) {
-      return;
-    }
-    Span span = tracingInfo.getParentSpan();
-    span.recordException(error);
-    span.setStatus(StatusCode.ERROR);
-    span.end();
-    logPrefixToSpanMap.remove(requestLogPrefix);
+    logPrefixToSpanMap.computeIfPresent(
+        requestLogPrefix,
+        (k, v) -> {
+          Span span = v.getParentSpan();
+          span.recordException(error);
+          span.setStatus(StatusCode.ERROR);
+          onEnd(span, request, executionInfo);
+          return null;
+        });
   }
 
   @Override
@@ -195,14 +196,14 @@ public class OtelRequestTracker implements RequestTracker {
       @NonNull Node node,
       @NonNull String requestLogPrefix,
       @Nullable ExecutionInfo executionInfo) {
-    TracingInfo tracingInfo = logPrefixToSpanMap.get(requestLogPrefix);
-    if (tracingInfo == null) {
-      return;
-    }
-    Span span = tracingInfo.getParentSpan();
-    span.setStatus(StatusCode.OK);
-    span.end();
-    logPrefixToSpanMap.remove(requestLogPrefix);
+    logPrefixToSpanMap.computeIfPresent(
+        requestLogPrefix,
+        (k, v) -> {
+          Span span = v.getParentSpan();
+          span.setStatus(StatusCode.OK);
+          onEnd(span, request, executionInfo);
+          return null;
+        });
   }
 
   @Override
@@ -214,15 +215,15 @@ public class OtelRequestTracker implements RequestTracker {
       @Nullable Node node,
       @NonNull String requestLogPrefix,
       @Nullable ExecutionInfo executionInfo) {
-    TracingInfo tracingInfo = logPrefixToSpanMap.get(requestLogPrefix);
-    if (tracingInfo == null) {
-      return;
-    }
-    Span span = tracingInfo.getParentSpan();
-    span.recordException(error);
-    span.end();
-    span.setStatus(StatusCode.ERROR);
-    logPrefixToSpanMap.remove(requestLogPrefix);
+    logPrefixToSpanMap.computeIfPresent(
+        requestLogPrefix,
+        (k, v) -> {
+          Span span = v.getParentSpan();
+          span.recordException(error);
+          span.setStatus(StatusCode.ERROR);
+          onEnd(span, request, executionInfo);
+          return null;
+        });
   }
 
   @Override
@@ -233,16 +234,22 @@ public class OtelRequestTracker implements RequestTracker {
       @NonNull Node node,
       @NonNull String requestLogPrefix,
       @NonNull ExecutionInfo executionInfo) {
-    RequestTracker.super.onNodeSuccess(
-        request, latencyNanos, executionProfile, node, requestLogPrefix, executionInfo);
-    TracingInfo tracingInfo = logPrefixToSpanMap.get(requestLogPrefix);
-    if (tracingInfo == null) {
-      return;
-    }
-    Span span = tracingInfo.getParentSpan();
-    span.setStatus(StatusCode.OK);
+    logPrefixToSpanMap.computeIfPresent(
+        requestLogPrefix,
+        (k, v) -> {
+          Span span = v.getParentSpan();
+          span.setStatus(StatusCode.OK);
+          onEnd(span, request, executionInfo);
+          return null;
+        });
+  }
+
+  private void onEnd(
+      @NonNull Span span, @NonNull Request request, @Nullable ExecutionInfo executionInfo) {
+    AttributesBuilder builder = gatherAttributes((Statement<?>) request, executionInfo);
+    builder.build().forEach((k, v) -> span.setAttribute(k.getKey(), v.toString()));
     // add cassandra query trace
-    if (executionInfo.getTracingId() != null) {
+    if (executionInfo != null && executionInfo.getTracingId() != null) {
       threadPool.submit(
           () -> {
             QueryTrace queryTrace = executionInfo.getQueryTrace();
@@ -252,13 +259,18 @@ public class OtelRequestTracker implements RequestTracker {
     } else {
       span.end();
     }
-    logPrefixToSpanMap.remove(requestLogPrefix);
   }
 
   private String statementToString(Request request) {
     StringBuilder builder = new StringBuilder();
-    this.formatter.appendQueryString(request, RequestLogger.DEFAULT_REQUEST_LOGGER_MAX_QUERY_LENGTH, builder);
-    this.formatter.appendValues(request, RequestLogger.DEFAULT_REQUEST_LOGGER_MAX_VALUES, RequestLogger.DEFAULT_REQUEST_LOGGER_MAX_VALUE_LENGTH, true, builder);
+    this.formatter.appendQueryString(
+        request, RequestLogger.DEFAULT_REQUEST_LOGGER_MAX_QUERY_LENGTH, builder);
+    this.formatter.appendValues(
+        request,
+        RequestLogger.DEFAULT_REQUEST_LOGGER_MAX_VALUES,
+        RequestLogger.DEFAULT_REQUEST_LOGGER_MAX_VALUE_LENGTH,
+        true,
+        builder);
     return builder.toString();
   }
 
@@ -282,8 +294,22 @@ public class OtelRequestTracker implements RequestTracker {
         Instant.ofEpochMilli(queryTrace.getStartedAt() + queryTrace.getDurationMicros() / 1000));
   }
 
-  private AttributesBuilder gatherAttributes(Statement<?> statement, ExecutionInfo executionInfo){
+  private AttributesBuilder gatherAttributes(
+      @NonNull Statement<?> statement, @Nullable ExecutionInfo executionInfo) {
     AttributesBuilder builder = Attributes.builder();
+
+    if (executionInfo != null && executionInfo.getCoordinator() != null) {
+      Node coordinator = executionInfo.getCoordinator();
+      updateServerAddressAndPort(builder, coordinator);
+
+      if (coordinator.getDatacenter() != null) {
+        builder.put(DB_CASSANDRA_COORDINATOR_DC, coordinator.getDatacenter());
+      }
+      if (coordinator.getHostId() != null) {
+        builder.put(DB_CASSANDRA_COORDINATOR_ID, coordinator.getHostId().toString());
+      }
+    }
+
     String consistencyLevel;
     DriverExecutionProfile config = this.context.getConfig().getDefaultProfile();
     if (statement.getConsistencyLevel() != null) {
@@ -292,13 +318,29 @@ public class OtelRequestTracker implements RequestTracker {
       consistencyLevel = config.getString(DefaultDriverOption.REQUEST_CONSISTENCY);
     }
     builder.put(DB_CASSANDRA_CONSISTENCY_LEVEL, consistencyLevel);
+    if (executionInfo != null) {
+      builder.put(
+          DB_CASSANDRA_SPECULATIVE_EXECUTION_COUNT, executionInfo.getSpeculativeExecutionCount());
+    }
 
-    Node coordinator = executionInfo.getCoordinator();
+    if (statement.getPageSize() > 0) {
+      builder.put(DB_CASSANDRA_PAGE_SIZE, statement.getPageSize());
+    } else {
+      int pageSize = config.getInt(DefaultDriverOption.REQUEST_PAGE_SIZE);
+      if (pageSize > 0) {
+        builder.put(DB_CASSANDRA_PAGE_SIZE, pageSize);
+      }
+    }
 
+    Boolean idempotent = statement.isIdempotent();
+    if (idempotent == null) {
+      idempotent = config.getBoolean(DefaultDriverOption.REQUEST_DEFAULT_IDEMPOTENCE);
+    }
+    builder.put(DB_CASSANDRA_IDEMPOTENCE, idempotent);
     return builder;
   }
 
-  private static void updateServerAddressAndPort(AttributesBuilder attributes, Node coordinator) {
+  private void updateServerAddressAndPort(AttributesBuilder attributes, Node coordinator) {
     EndPoint endPoint = coordinator.getEndPoint();
     if (endPoint instanceof DefaultEndPoint) {
       InetSocketAddress address = ((DefaultEndPoint) endPoint).resolve();
@@ -310,10 +352,8 @@ public class OtelRequestTracker implements RequestTracker {
       try {
         object = proxyAddressField.get(sniEndPoint);
       } catch (Exception e) {
-        logger.log(
-                Level.FINE,
-                "Error when accessing the private field proxyAddress of SniEndPoint using reflection.",
-                e);
+        this.LOG.trace(
+            "Error when accessing the private field proxyAddress of SniEndPoint using reflection.");
       }
       if (object instanceof InetSocketAddress) {
         InetSocketAddress address = (InetSocketAddress) object;
@@ -323,7 +363,19 @@ public class OtelRequestTracker implements RequestTracker {
     }
   }
 
+  @Nullable
+  private Field getProxyAddressField() {
+    try {
+      Field field = SniEndPoint.class.getDeclaredField("proxyAddress");
+      field.setAccessible(true);
+      return field;
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
   private static class TracingInfo {
+    // each request should be in the same thread
     private Span parentSpan;
     private Span createdSpan; // the span from handler created to request sent
 

@@ -439,7 +439,9 @@ public class ProgrammaticArguments {
     }
 
     @NonNull
-    public Builder withOpenTelemetryNativeTraceExecutor(@NonNull ExecutorService executorService) {
+    public Builder withOpenTelemetryCustomizedExecutor(
+        @NonNull OpenTelemetry openTelemetry, @NonNull ExecutorService executorService) {
+      this.openTelemetry = openTelemetry;
       this.openTelemetryNativeTraceExecutor = executorService;
       return this;
     }

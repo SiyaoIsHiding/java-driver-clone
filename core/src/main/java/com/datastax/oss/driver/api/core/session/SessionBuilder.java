@@ -821,8 +821,10 @@ public abstract class SessionBuilder<SelfT extends SessionBuilder, SessionT> {
 
   /** */
   @NonNull
-  public SelfT withOpenTelemetryNativeTraceExecutor(@NonNull ExecutorService executorService) {
-    this.programmaticArgumentsBuilder.withOpenTelemetryNativeTraceExecutor(executorService);
+  public SelfT withOpenTelemetryCustomizedExecutor(
+      @NonNull OpenTelemetry openTelemetry, @NonNull ExecutorService executorService) {
+    this.programmaticArgumentsBuilder.withOpenTelemetryCustomizedExecutor(
+        openTelemetry, executorService);
     return self;
   }
 
