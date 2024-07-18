@@ -247,7 +247,7 @@ pipeline {
         }
     }
 
-    staget('Integration Tests'){
+    stage ('Integration Tests'){
         steps {
             script {
               sh label: 'Integration tests', script: '''#!/bin/bash -le
