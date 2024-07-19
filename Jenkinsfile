@@ -224,6 +224,7 @@ pipeline {
   agent {
     docker {
       image 'janehe/cassandra-java-driver-dev-env'
+      args '-it --entrypoint=/bin/bash'
     }
   }
 
