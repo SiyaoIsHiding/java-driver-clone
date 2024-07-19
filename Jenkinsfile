@@ -224,7 +224,6 @@ pipeline {
   agent {
     docker {
       image 'janehe/cassandra-java-driver-dev-env'
-      label 'cassandra'
     }
     label 'cassandra'
   }
