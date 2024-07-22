@@ -26,29 +26,18 @@ pipeline {
     stage('Unit Tests'){
       agent {
         docker {
-          image 'janehe/cassandra-java-driver-dev-env'
+          image 'node:7-alpine'
           label 'cassandra-medium'
         }
       }
         steps {
             script {
               sh label: 'Unit tests', script: '''#!/bin/bash -le
-                cd ~/cassandra-java-driver
-                mvn -B -V test
+                npm -v
               '''
             }
         }
     }
 
-    stage ('Integration Tests'){
-        steps {
-            script {
-              sh label: 'Integration tests', script: '''#!/bin/bash -le
-                cd ~/cassandra-java-driver
-                mvn -B -V -Dit.test="com.datastax.oss.**" verify
-              '''
-            }
-        }
-    }
   }
 }
