@@ -233,9 +233,7 @@ pipeline {
     stage('Tests'){
         steps {
             script {
-              sh label: 'Unit tests', script: '''
-                ls
-              '''
+              sh 'ls'
             }
         }
     }
