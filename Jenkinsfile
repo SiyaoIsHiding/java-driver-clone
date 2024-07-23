@@ -13,7 +13,7 @@ pipeline {
     stage('Ls'){
         steps {
             script {
-              sh label: 'Ls', script: '''#!/bin/bash 
+              sh label: 'Ls', script: '''
                 ls /home/jenkins/agent/workspace
                 pwd
               '''
