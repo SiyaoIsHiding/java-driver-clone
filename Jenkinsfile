@@ -21,7 +21,7 @@
 pipeline {
   agent {
     docker {
-      image 'node:7-alpine'
+      image 'hashicorp/terraform:light'
       label 'cassandra-medium'
     }
   }
