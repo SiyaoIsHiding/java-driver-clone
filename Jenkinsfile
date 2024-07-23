@@ -224,8 +224,8 @@ pipeline {
   agent {
     docker {
       image 'janehe/cassandra-java-driver-dev-env'
+      label 'cassandra-medium'
     }
-    label 'cassandra-medium'
   }
 
   // Global pipeline timeout
