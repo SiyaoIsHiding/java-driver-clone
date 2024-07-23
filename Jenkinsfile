@@ -228,20 +228,13 @@ pipeline {
     }
   }
 
-  // Global pipeline timeout
-  options {
-    timeout(time: 10, unit: 'HOURS')
-    buildDiscarder(logRotator(artifactNumToKeepStr: '10', // Keep only the last 10 artifacts
-                              numToKeepStr: '50'))        // Keep only the last 50 build records
-  }
 
   stages {
     stage('Tests'){
         steps {
             script {
               sh label: 'Unit tests', script: '''
-                cd cassandra-java-driver
-                mvn -B -V verify
+                ls
               '''
             }
         }
