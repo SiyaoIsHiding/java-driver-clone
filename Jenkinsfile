@@ -21,7 +21,8 @@
 pipeline {
   agent {
     docker {
-      image 'hashicorp/terraform:light'
+      image 'janehe/cassandra-java-driver-dev-env'
+      args '-it --entrypoint=/bin/bash'
       label 'cassandra-medium'
     }
   }
