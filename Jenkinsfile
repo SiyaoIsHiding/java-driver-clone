@@ -31,7 +31,11 @@ pipeline {
     stage('Tests'){
         steps {
             script {
-              sh 'jabba use default && mvn verify'
+              sh '''
+              export JAVA_HOME=$(jabba which zulu@1.8)
+	            export PATH=$JAVA_HOME/bin:$PATH
+              mvn verify
+              '''
             }
         }
     }
