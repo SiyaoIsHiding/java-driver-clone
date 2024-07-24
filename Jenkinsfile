@@ -31,7 +31,7 @@ pipeline {
     stage('Tests'){
         steps {
             script {
-              sh 'mvn verify'
+              sh 'jabba use default && mvn verify'
             }
         }
     }
