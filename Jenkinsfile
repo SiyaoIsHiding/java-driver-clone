@@ -31,7 +31,7 @@ pipeline {
     stage('Tests'){
         steps {
             script {
-              sh 'ls'
+              sh 'mvn verify'
             }
         }
     }
