@@ -37,12 +37,13 @@ pipeline {
 
   stages {
     stage('Tests'){
-        steps {
-            script {
-		executeTests()
-		junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
-                junit testResults: '**/target/failsafe-reports/TEST-*.xml', allowEmptyResults: true
-            }
-    }
-  }
+      steps {
+				script {
+					executeTests()
+					junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
+					junit testResults: '**/target/failsafe-reports/TEST-*.xml', allowEmptyResults: true
+				}
+	    }
+	  }
+	}
 }
