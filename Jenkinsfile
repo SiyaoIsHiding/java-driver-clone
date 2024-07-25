@@ -48,30 +48,35 @@ pipeline {
     }
   }
 
-	matrix {
-		axes {
-			axis {
-					name 'TEST_JAVA_VERSION'
-					values 'zulu@1.8', 'openjdk@1.11.0', 'openjdk@1.17.0'
-			}
-			axis {
-					name 'SERVER_VERSION'
-					values '3.11',      // Latest stable Apache CassandraⓇ
-								 '4.1',       // Development Apache CassandraⓇ
-								 'dse-6.8.30', // Current DataStax Enterprise
-								 '5.0-beta1' // Beta Apache CassandraⓇ
-			}
-    }
-	  stages {
-	    stage('Tests') {
-	      steps {
-	        script {
-		  			addJavaPath()
-	          executeTests()
-	          junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
-	          junit testResults: '**/target/failsafe-reports/TEST-*.xml', allowEmptyResults: true
-	        }
-	      }
+
+	stages {
+		stage('Matrix') {
+				matrix {
+					axes {
+						axis {
+								name 'TEST_JAVA_VERSION'
+								values 'zulu@1.8', 'openjdk@1.11.0', 'openjdk@1.17.0'
+						}
+						axis {
+								name 'SERVER_VERSION'
+								values '3.11',      // Latest stable Apache CassandraⓇ
+											 '4.1',       // Development Apache CassandraⓇ
+											 'dse-6.8.30', // Current DataStax Enterprise
+											 '5.0-beta1' // Beta Apache CassandraⓇ
+						}
+			    }
+					stages {
+						stage {
+							steps {
+				        script {
+					  			addJavaPath()
+				          executeTests()
+				          junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
+				          junit testResults: '**/target/failsafe-reports/TEST-*.xml', allowEmptyResults: true
+				        }
+				      }
+						}
+					}
 	    }
 	  }
 	}
