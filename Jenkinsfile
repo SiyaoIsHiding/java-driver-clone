@@ -37,6 +37,7 @@ def addJavaPath() {
 def executeTests() {
 	def testJavaHome = sh(label: 'Get TEST_JAVA_HOME',script: "jabba which ${TEST_JAVA_VERSION}", returnStdout: true).trim()
   def testJavaVersion = (TEST_JAVA_VERSION =~ /.*@1\.(\d+)/)[0][1]
+	sh "mvn -version"
   sh '''mvn -B -V verify -Ptest-jdk-''' + testJavaVersion +
       ''' -DtestJavaHome='''+testJavaHome+
 			''' -Dccm.version=${SERVER_VERSION} -Dccm.dse=${CCM_IS_DSE}'''
