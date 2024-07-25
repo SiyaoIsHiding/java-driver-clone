@@ -30,7 +30,7 @@ pipeline {
   agent {
     docker {
       image 'janehe/cassandra-java-driver-dev-env'
-      label 'cassandra-medium'
+      label 'cassandra-amd64-large'
     }
   }
 
@@ -40,14 +40,9 @@ pipeline {
         steps {
             script {
 		executeTests()
-            }
-	post {
-              always {
-                junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
+		junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
                 junit testResults: '**/target/failsafe-reports/TEST-*.xml', allowEmptyResults: true
-              }
             }
-        }
     }
   }
 }
