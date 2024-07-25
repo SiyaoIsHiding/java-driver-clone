@@ -33,7 +33,7 @@ def executeTests() {
   export JAVA11_HOME=$(jabba which zulu@1.11.0)
 	export JAVA17_HOME=$(jabba which amazon-corretto@1.17.0-0.35.1)
   export JAVA_HOME=$JAVA8_HOME
-  export PATH=$JAVA8_HOME/bin:JAVA11_HOME/bin:JAVA17_HOME/bin:$PATH
+  export PATH=$JAVA8_HOME/bin:$JAVA11_HOME/bin:$JAVA17_HOME/bin:$PATH
 	mvn -B -V verify -Ptest-jdk-''' + testJavaVersion +
       ''' -DtestJavaHome='''+testJavaHome+
 			''' -Dccm.version=${SERVER_VERSION} -Dccm.dse=''' + ccmIsDse + ''' -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=true'''
