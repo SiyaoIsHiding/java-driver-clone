@@ -66,6 +66,7 @@ pipeline {
 	    stage('Tests') {
 	      steps {
 	        script {
+		  			addJavaPath()
 	          executeTests()
 	          junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
 	          junit testResults: '**/target/failsafe-reports/TEST-*.xml', allowEmptyResults: true
