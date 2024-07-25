@@ -66,7 +66,7 @@ pipeline {
 						}
 			    }
 					stages {
-						stage {
+						stage('Tests') {
 							steps {
 				        script {
 					  			addJavaPath()
