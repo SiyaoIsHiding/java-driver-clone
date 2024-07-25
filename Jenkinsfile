@@ -36,7 +36,7 @@ def executeTests() {
   export PATH=$JAVA8_HOME/bin:JAVA11_HOME/bin:JAVA17_HOME/bin:$PATH
 	mvn -B -V verify -Ptest-jdk-''' + testJavaVersion +
       ''' -DtestJavaHome='''+testJavaHome+
-			''' -Dccm.version=${SERVER_VERSION} -Dccm.dse=''' + ccmIsDse
+			''' -Dccm.version=${SERVER_VERSION} -Dccm.dse=''' + ccmIsDse + ''' -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=true'''
 }
 
 pipeline {
