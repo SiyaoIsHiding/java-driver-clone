@@ -29,6 +29,8 @@ def addJavaPath() {
   '''
 	if (env.SERVER_VERSION.split('-')[0] == 'dse') {
 		sh 'export CCM_IS_DSE=true'
+	} else {
+		sh 'export CCM_IS_DSE=false'
 	}
 }
 
