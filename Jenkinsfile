@@ -19,28 +19,25 @@
  * under the License.
  */
 
-def addJavaPath() {
-	sh '''
-  export JAVA8_HOME=$(jabba which zulu@1.8)
-  export JAVA11_HOME=$(jabba which zulu@1.11.0)
-	export JAVA17_HOME=$(jabba which amazon-corretto@1.17.0-0.35.1)
-  export JAVA_HOME=$JAVA8_HOME
-  export PATH=$JAVA8_HOME/bin:$PATH
-  '''
-	if (env.SERVER_VERSION.split('-')[0] == 'dse') {
-		sh 'export CCM_IS_DSE=true'
-	} else {
-		sh 'export CCM_IS_DSE=false'
-	}
-}
 
 def executeTests() {
 	def testJavaHome = sh(label: 'Get TEST_JAVA_HOME',script: "jabba which ${TEST_JAVA_VERSION}", returnStdout: true).trim()
   def testJavaVersion = (TEST_JAVA_VERSION =~ /.*@1\.(\d+)/)[0][1]
+	if (env.SERVER_VERSION.split('-')[0] == 'dse') {
+		def ccmIsDse = 'true'
+	} else {
+		def ccmIsDse = 'false'
+	}
 	sh "mvn -version"
-  sh '''mvn -B -V verify -Ptest-jdk-''' + testJavaVersion +
+  sh '''
+	export JAVA8_HOME=$(jabba which zulu@1.8)
+  export JAVA11_HOME=$(jabba which zulu@1.11.0)
+	export JAVA17_HOME=$(jabba which amazon-corretto@1.17.0-0.35.1)
+  export JAVA_HOME=$JAVA8_HOME
+  export PATH=$JAVA8_HOME/bin:JAVA11_HOME/bin:JAVA17_HOME/bin:$PATH
+	mvn -B -V verify -Ptest-jdk-''' + testJavaVersion +
       ''' -DtestJavaHome='''+testJavaHome+
-			''' -Dccm.version=${SERVER_VERSION} -Dccm.dse=${CCM_IS_DSE}'''
+			''' -Dccm.version=${SERVER_VERSION} -Dccm.dse=''' + ccmIsDse
 }
 
 pipeline {
@@ -72,7 +69,6 @@ pipeline {
 						stage('Tests') {
 							steps {
 				        script {
-					  			addJavaPath()
 				          executeTests()
 				          junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
 				          junit testResults: '**/target/failsafe-reports/TEST-*.xml', allowEmptyResults: true
