@@ -39,7 +39,7 @@ def executeTests() {
   def testJavaVersion = (TEST_JAVA_VERSION =~ /.*\.(\d+)/)[0][1]
   sh "mvn - B - V verify -Ptest-jdk-" + testJavaVersion +
       " -DtestJavaHome="+testJavaHome+
-			" -Dccm.version=${SERVER_VERSION} -Dccm.dse=${CCM_IS_DSE}"
+			" -Dccm.version=${SERVER_VERSION} -Dccm.dse=$CCM_IS_DSE"
 }
 
 pipeline {
