@@ -18,6 +18,14 @@
  * under the License.
  */
 
+def executeTests(){
+      sh '''
+      export JAVA_HOME=$(jabba which zulu@1.8)
+      export PATH=$JAVA_HOME/bin:$PATH
+      mvn -B -V verify
+      '''
+}
+
 pipeline {
   agent {
     docker {
@@ -31,11 +39,13 @@ pipeline {
     stage('Tests'){
         steps {
             script {
-              sh '''
-              export JAVA_HOME=$(jabba which zulu@1.8)
-	            export PATH=$JAVA_HOME/bin:$PATH
-              mvn verify
-              '''
+		executeTests()
+            }
+	post {
+              always {
+                junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
+                junit testResults: '**/target/failsafe-reports/TEST-*.xml', allowEmptyResults: true
+              }
             }
         }
     }
