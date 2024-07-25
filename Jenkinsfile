@@ -23,11 +23,10 @@
 def executeTests() {
 	def testJavaHome = sh(label: 'Get TEST_JAVA_HOME',script: "jabba which ${TEST_JAVA_VERSION}", returnStdout: true).trim()
   def testJavaVersion = (TEST_JAVA_VERSION =~ /.*@1\.(\d+)/)[0][1]
+	def ccmIsDse = 'false'
 	if (env.SERVER_VERSION.split('-')[0] == 'dse') {
-		def ccmIsDse = 'true'
-	} else {
-		def ccmIsDse = 'false'
-	}
+		ccmIsDse = 'true'
+	} 
 	sh "mvn -version"
   sh '''
 	export JAVA8_HOME=$(jabba which zulu@1.8)
