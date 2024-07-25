@@ -1,4 +1,5 @@
 #!groovy
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,12 +19,25 @@
  * under the License.
  */
 
-def executeTests(){
-      sh '''
-      export JAVA_HOME=$(jabba which zulu@1.8)
-      export PATH=$JAVA_HOME/bin:$PATH
-      mvn -B -V verify
-      '''
+def addJavaPath() {
+	sh '''
+  export JAVA8_HOME=$(jabba which zulu@1.8)
+  export JAVA11_HOME=$(jabba which zulu@1.11.0)
+	export JAVA17_HOME=$(jabba which amazon-corretto@1.17.0-0.35.1)
+  export JAVA_HOME=$JAVA8_HOME
+  export PATH=$JAVA_HOME8/bin:$JAVA11_HOME/bin:$JAVA17_HOME/bin:$PATH
+  '''
+	if (env.SERVER_VERSION.split('-')[0] == 'dse') {
+		sh 'export CCM_IS_DSE=true'
+	}
+}
+
+def executeTests() {
+	def testJavaHome = sh(label: 'Get TEST_JAVA_HOME',script: "jabba which ${TEST_JAVA_VERSION}", returnStdout: true).trim()
+  def testJavaVersion = (TEST_JAVA_VERSION =~ /.*\.(\d+)/)[0][1]
+  sh "mvn - B - V verify -Ptest-jdk-" + testJavaVersion +
+      " -DtestJavaHome="+testJavaHome+
+			" -Dccm.version=${SERVER_VERSION} -Dccm.dse=${CCM_IS_DSE}"
 }
 
 pipeline {
@@ -34,15 +48,29 @@ pipeline {
     }
   }
 
-
-  stages {
-    stage('Tests'){
-      steps {
-				script {
-					executeTests()
-					junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
-					junit testResults: '**/target/failsafe-reports/TEST-*.xml', allowEmptyResults: true
-				}
+	matrix {
+		axes {
+			axis {
+					name 'TEST_JAVA_VERSION'
+					values 'zulu@1.8', 'openjdk@1.11.0', 'openjdk@1.17.0'
+			}
+			axis {
+					name 'SERVER_VERSION'
+					values '3.11',      // Latest stable Apache CassandraⓇ
+								 '4.1',       // Development Apache CassandraⓇ
+								 'dse-6.8.30', // Current DataStax Enterprise
+								 '5.0-beta1' // Beta Apache CassandraⓇ
+			}
+    }
+	  stages {
+	    stage('Tests') {
+	      steps {
+	        script {
+	          executeTests()
+	          junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
+	          junit testResults: '**/target/failsafe-reports/TEST-*.xml', allowEmptyResults: true
+	        }
+	      }
 	    }
 	  }
 	}
