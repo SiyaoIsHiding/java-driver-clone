@@ -43,10 +43,7 @@ def executeTests() {
 
 pipeline {
     agent {
-        docker {
-            image 'janehe/cassandra-java-driver-dev-env'
-            label 'cassandra-amd64-large'
-        }
+	label 'cassandra-amd64-large'
     }
 
 
@@ -68,6 +65,11 @@ pipeline {
                 }
                 stages {
                     stage('Tests') {
+			agent {
+				docker {
+            				image 'janehe/cassandra-java-driver-dev-env'
+        			}
+			}
                         steps {
                             script {
                                 executeTests()
