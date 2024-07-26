@@ -1,4 +1,5 @@
 #!groovy
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,36 +19,63 @@
  * under the License.
  */
 
-def executeTests(){
-      sh '''
-      export JAVA_HOME=$(jabba which zulu@1.8)
-      export PATH=$JAVA_HOME/bin:$PATH
-      mvn -B -V verify
-      '''
+
+def executeTests() {
+    def testJavaHome = sh(label: 'Get TEST_JAVA_HOME', script: "jabba which ${TEST_JAVA_VERSION}", returnStdout: true).trim()
+    def testJavaVersion = (TEST_JAVA_VERSION =~ /.*@1\.(\d+)/)[0][1]
+    def ccmIsDse = 'false'
+    if (env.SERVER_VERSION.split('-')[0] == 'dse') {
+        ccmIsDse = 'true'
+    }
+    sh '''
+	export JAVA8_HOME=$(jabba which zulu@1.8)
+  export JAVA11_HOME=$(jabba which openjdk@1.11.0)
+	export JAVA17_HOME=$(jabba which openjdk@1.17.0)
+  export JAVA_HOME=$JAVA8_HOME
+  export PATH=$JAVA8_HOME/bin:$JAVA11_HOME/bin:$JAVA17_HOME/bin:$PATH
+  	mvn -B -V install -DskipTests -Dmaven.javadoc.skip=true
+	mvn -B -V verify -T 1 -Ptest-jdk-''' + testJavaVersion +
+            ''' -DtestJavaHome=''' + testJavaHome +
+            ''' -Dccm.version=${SERVER_VERSION} -Dccm.dse=''' + ccmIsDse + ''' -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=true'''
 }
 
 pipeline {
-  agent {
-    docker {
-      image 'janehe/cassandra-java-driver-dev-env'
-      label 'cassandra-medium'
+    agent {
+        docker {
+            image 'janehe/cassandra-java-driver-dev-env'
+            label 'cassandra-amd64-large'
+        }
     }
-  }
 
 
-  stages {
-    stage('Tests'){
-        steps {
-            script {
-		executeTests()
-            }
-	post {
-              always {
-                junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
-                junit testResults: '**/target/failsafe-reports/TEST-*.xml', allowEmptyResults: true
-              }
+    stages {
+        stage('Matrix') {
+            matrix {
+                axes {
+                    axis {
+                        name 'TEST_JAVA_VERSION'
+                        values 'zulu@1.8', 'openjdk@1.11.0', 'openjdk@1.17.0'
+                    }
+                    axis {
+                        name 'SERVER_VERSION'
+                        values '3.11',      // Latest stable Apache CassandraⓇ
+                                '4.1',       // Development Apache CassandraⓇ
+                                'dse-6.8.30', // Current DataStax Enterprise
+                                '5.0-beta1' // Beta Apache CassandraⓇ
+                    }
+                }
+                stages {
+                    stage('Tests') {
+                        steps {
+                            script {
+                                executeTests()
+                                junit testResults: '**/target/surefire-reports/TEST-*.xml', allowEmptyResults: true
+                                junit testResults: '**/target/failsafe-reports/TEST-*.xml', allowEmptyResults: true
+                            }
+                        }
+                    }
+                }
             }
         }
     }
-  }
 }
