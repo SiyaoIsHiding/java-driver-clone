@@ -114,7 +114,7 @@ def executeTests() {
     jabba which ${JABBA_VERSION}''', returnStdout: true).trim()
   def testJavaVersion = (JABBA_VERSION =~ /.*\.(\d+)/)[0][1]
 
-  def executeTestScript = '''#!/bin/bash -le
+  def executeTestScript = '''#!/bin/bash -lex
     # Load CCM environment variables
     set -o allexport
     . ${HOME}/environment.txt
