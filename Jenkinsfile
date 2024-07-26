@@ -24,8 +24,10 @@ def executeTests() {
     def testJavaHome = sh(label: 'Get TEST_JAVA_HOME', script: "jabba which ${TEST_JAVA_VERSION}", returnStdout: true).trim()
     def testJavaVersion = (TEST_JAVA_VERSION =~ /.*@1\.(\d+)/)[0][1]
     def ccmIsDse = 'false'
+    def serverVersion = env.SERVER_VERSION
     if (env.SERVER_VERSION.split('-')[0] == 'dse') {
         ccmIsDse = 'true'
+        serverVersion = env.SERVER_VERSION.split('-')[1]
     }
     sh '''
 	export JAVA8_HOME=$(jabba which zulu@1.8)
@@ -38,7 +40,7 @@ def executeTests() {
   	mvn -B -V install -DskipTests -Dmaven.javadoc.skip=true
 	mvn -B -V verify -T 1 -Ptest-jdk-''' + testJavaVersion +
             ''' -DtestJavaHome=''' + testJavaHome +
-            ''' -Dccm.version=${SERVER_VERSION} -Dccm.dse=''' + ccmIsDse + ''' -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=true'''
+            ''' -Dccm.version=''' + serverVersion + ''' -Dccm.dse=''' + ccmIsDse + ''' -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=true'''
 }
 
 pipeline {
