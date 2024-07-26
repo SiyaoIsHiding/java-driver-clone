@@ -33,10 +33,9 @@ def executeTests() {
 	export JAVA8_HOME=$(jabba which zulu@1.8)
   	export JAVA11_HOME=$(jabba which openjdk@1.11.0)
 	export JAVA17_HOME=$(jabba which openjdk@1.17.0)
-  	export JAVA_HOME=$JAVA11_HOME
-  	export PATH=$JAVA8_HOME/bin:$JAVA11_HOME/bin:$JAVA17_HOME/bin:$PATH
-  	JAVA_HOME=$JAVA8_HOME mvn -B -V install -DskipTests -Dmaven.javadoc.skip=true
-	JAVA_HOME=$JAVA8_HOME mvn -B -V verify -T 1 -Ptest-jdk-''' + testJavaVersion +
+  	export JAVA_HOME=$JAVA8_HOME
+  	mvn -B -V install -DskipTests -Dmaven.javadoc.skip=true
+	mvn -B -V verify -T 1 -Ptest-jdk-''' + testJavaVersion +
             ''' -DtestJavaHome=''' + testJavaHome +
             ''' -Dccm.version=''' + serverVersion + ''' -Dccm.dse=''' + ccmIsDse + ''' -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=true'''
 }
