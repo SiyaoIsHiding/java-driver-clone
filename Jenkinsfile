@@ -30,10 +30,6 @@ def executeTests() {
         serverVersion = env.SERVER_VERSION.split('-')[1]
     }
     sh '''
-	export JAVA8_HOME=$(jabba which zulu@1.8)
-  	export JAVA11_HOME=$(jabba which openjdk@1.11.0)
-	export JAVA17_HOME=$(jabba which openjdk@1.17.0)
-  	export JAVA_HOME=$JAVA8_HOME
    	printenv | sort
   	mvn -B -V install -DskipTests -Dmaven.javadoc.skip=true
 	mvn -B -V verify -T 1 -Ptest-jdk-''' + testJavaVersion +
