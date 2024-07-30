@@ -329,8 +329,7 @@ public class CcmBridge implements AutoCloseable {
   }
 
   private void updateJvmVersion(List<String> cmdAndArgs) {
-    overrideJvmVersionForDseWorkloads()
-        .ifPresent(jvmVersion -> cmdAndArgs.add(String.format("--jvm_version=%d", jvmVersion)));
+    cmdAndArgs.add(String.format("--jvm_version=%d", 8));
   }
 
   public void stop(int n) {
@@ -468,26 +467,6 @@ public class CcmBridge implements AutoCloseable {
       }
     }
     return Integer.parseInt(version);
-  }
-
-  private Optional<Integer> overrideJvmVersionForDseWorkloads() {
-    if (getCurrentJvmMajorVersion() <= 8) {
-      return Optional.empty();
-    }
-
-    if (!DSE_ENABLEMENT || !getDseVersion().isPresent()) {
-      return Optional.empty();
-    }
-
-    if (getDseVersion().get().compareTo(Version.parse("6.8.19")) < 0) {
-      return Optional.empty();
-    }
-
-    if (dseWorkloads.contains("graph")) {
-      return Optional.of(8);
-    }
-
-    return Optional.empty();
   }
 
   private static String IN_MS_STR = "_in_ms";
