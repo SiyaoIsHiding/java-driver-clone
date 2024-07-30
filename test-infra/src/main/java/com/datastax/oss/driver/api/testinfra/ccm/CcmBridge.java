@@ -451,24 +451,6 @@ public class CcmBridge implements AutoCloseable {
     return f;
   }
 
-  /**
-   * Get the current JVM major version (1.8.0_372 -> 8, 11.0.19 -> 11)
-   *
-   * @return major version of current JVM
-   */
-  private static int getCurrentJvmMajorVersion() {
-    String version = System.getProperty("java.version");
-    if (version.startsWith("1.")) {
-      version = version.substring(2, 3);
-    } else {
-      int dot = version.indexOf(".");
-      if (dot != -1) {
-        version = version.substring(0, dot);
-      }
-    }
-    return Integer.parseInt(version);
-  }
-
   private static String IN_MS_STR = "_in_ms";
   private static int IN_MS_STR_LENGTH = IN_MS_STR.length();
   private static String ENABLE_STR = "enable_";
