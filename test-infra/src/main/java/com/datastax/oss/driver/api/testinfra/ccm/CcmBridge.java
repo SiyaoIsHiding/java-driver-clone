@@ -329,7 +329,7 @@ public class CcmBridge implements AutoCloseable {
   }
 
   private void updateJvmVersion(List<String> cmdAndArgs) {
-    cmdAndArgs.add(String.format("--jvm_version=%d", 8));
+    cmdAndArgs.add(String.format("--jvm-version=%d", 8));
   }
 
   public void stop(int n) {
