@@ -411,7 +411,9 @@ public class CcmBridge implements AutoCloseable {
       executor.setStreamHandler(streamHandler);
       executor.setWatchdog(watchDog);
 
-      int retValue = executor.execute(cli);
+      Map<String, String> env = new LinkedHashMap<>(System.getenv());
+      env.put("JAVA_HOME", System.getProperty("JAVA8_HOME"));
+      int retValue = executor.execute(cli, env);
       if (retValue != 0) {
         LOG.error("Non-zero exit code ({}) returned from executing ccm command: {}", retValue, cli);
       }
