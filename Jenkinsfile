@@ -30,7 +30,7 @@ def executeTests() {
         serverVersion = env.SERVER_VERSION.split('-')[1]
     }
     sh '''
-    	. ~/.bashrc
+    	. ~/env.txt
    	printenv | sort
   	mvn -B -V install -DskipTests -Dmaven.javadoc.skip=true
 	mvn -B -V verify -T 1 -Ptest-jdk-''' + testJavaVersion +
