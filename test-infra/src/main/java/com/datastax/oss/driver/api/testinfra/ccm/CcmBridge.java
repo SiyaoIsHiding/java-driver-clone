@@ -416,6 +416,7 @@ public class CcmBridge implements AutoCloseable {
 
       Map<String, String> env = new LinkedHashMap<>(System.getenv());
       env.put("JAVA_HOME", System.getProperty(String.format("JAVA%d_HOME", getJavaVersionToUse())));
+      LOG.info("Executing ccm command: {}", cli);
       int retValue = executor.execute(cli, env);
       if (retValue != 0) {
         LOG.error("Non-zero exit code ({}) returned from executing ccm command: {}", retValue, cli);
