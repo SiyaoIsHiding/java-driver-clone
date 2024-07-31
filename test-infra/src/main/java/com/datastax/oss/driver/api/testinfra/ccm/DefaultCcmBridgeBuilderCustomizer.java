@@ -18,13 +18,17 @@
 package com.datastax.oss.driver.api.testinfra.ccm;
 
 import com.datastax.oss.driver.api.core.Version;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** @see CcmRule */
 @SuppressWarnings("unused")
 public class DefaultCcmBridgeBuilderCustomizer {
+  private static final Logger LOG = LoggerFactory.getLogger(DefaultCcmBridgeBuilderCustomizer.class);
 
   public static CcmBridge.Builder configureBuilder(CcmBridge.Builder builder) {
     if (!CcmBridge.DSE_ENABLEMENT && CcmBridge.VERSION.getMajor() >= 4) {
+      LOG.info("Adding enable_sasi_indexes for version " + CcmBridge.VERSION);
       builder.withCassandraConfiguration("enable_materialized_views", true);
       builder.withCassandraConfiguration("enable_sasi_indexes", true);
     }
