@@ -293,7 +293,7 @@ public class CcmBridge implements AutoCloseable {
   public void start() {
     if (started.compareAndSet(false, true)) {
       List<String> cmdAndArgs = Lists.newArrayList("start", jvmArgs, "--wait-for-binary-proto");
-      updateJvmVersion(cmdAndArgs);
+      cmdAndArgs.add(String.format("--jvm-version=%d", getJavaVersionToUse()));
       try {
         execute(cmdAndArgs.toArray(new String[0]));
       } catch (RuntimeException re) {
@@ -324,12 +324,15 @@ public class CcmBridge implements AutoCloseable {
 
   public void start(int n) {
     List<String> cmdAndArgs = Lists.newArrayList("node" + n, "start");
-    updateJvmVersion(cmdAndArgs);
+    cmdAndArgs.add(String.format("--jvm-version=%d", getJavaVersionToUse()));
     execute(cmdAndArgs.toArray(new String[0]));
   }
 
-  private void updateJvmVersion(List<String> cmdAndArgs) {
-    cmdAndArgs.add(String.format("--jvm-version=%d", 8));
+  private int getJavaVersionToUse() {
+    if (VERSION.getMajor() >= 5) {
+      return 11;
+    }
+    return 8;
   }
 
   public void stop(int n) {
@@ -412,7 +415,7 @@ public class CcmBridge implements AutoCloseable {
       executor.setWatchdog(watchDog);
 
       Map<String, String> env = new LinkedHashMap<>(System.getenv());
-      env.put("JAVA_HOME", System.getProperty("JAVA8_HOME"));
+      env.put("JAVA_HOME", System.getProperty(String.format("JAVA%d_HOME", getJavaVersionToUse())));
       int retValue = executor.execute(cli, env);
       if (retValue != 0) {
         LOG.error("Non-zero exit code ({}) returned from executing ccm command: {}", retValue, cli);
@@ -425,6 +428,8 @@ public class CcmBridge implements AutoCloseable {
       }
     }
   }
+
+  private Map<String, String> overwriteJavaHome() {}
 
   @Override
   public void close() {
