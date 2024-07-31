@@ -24,7 +24,8 @@ import org.slf4j.LoggerFactory;
 /** @see CcmRule */
 @SuppressWarnings("unused")
 public class DefaultCcmBridgeBuilderCustomizer {
-  private static final Logger LOG = LoggerFactory.getLogger(DefaultCcmBridgeBuilderCustomizer.class);
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DefaultCcmBridgeBuilderCustomizer.class);
 
   public static CcmBridge.Builder configureBuilder(CcmBridge.Builder builder) {
     if (!CcmBridge.DSE_ENABLEMENT && CcmBridge.VERSION.getMajor() >= 4) {
