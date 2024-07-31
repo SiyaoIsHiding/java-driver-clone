@@ -24,8 +24,7 @@ import com.datastax.oss.driver.api.core.Version;
 public class DefaultCcmBridgeBuilderCustomizer {
 
   public static CcmBridge.Builder configureBuilder(CcmBridge.Builder builder) {
-    if (!CcmBridge.DSE_ENABLEMENT
-        && CcmBridge.VERSION.getMajor() >= 4) {
+    if (!CcmBridge.DSE_ENABLEMENT && CcmBridge.VERSION.getMajor() >= 4) {
       builder.withCassandraConfiguration("enable_materialized_views", true);
       builder.withCassandraConfiguration("enable_sasi_indexes", true);
     }
