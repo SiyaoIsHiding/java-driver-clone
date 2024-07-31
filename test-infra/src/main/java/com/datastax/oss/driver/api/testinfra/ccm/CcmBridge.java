@@ -329,7 +329,7 @@ public class CcmBridge implements AutoCloseable {
   }
 
   private int getJavaVersionToUse() {
-    if (VERSION.getMajor() >= 5) {
+    if (VERSION.getMajor() >= 5 && !DSE_ENABLEMENT) {
       return 11;
     }
     return 8;
