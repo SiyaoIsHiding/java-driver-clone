@@ -429,8 +429,6 @@ public class CcmBridge implements AutoCloseable {
     }
   }
 
-  private Map<String, String> overwriteJavaHome() {}
-
   @Override
   public void close() {
     if (created.compareAndSet(true, false)) {
