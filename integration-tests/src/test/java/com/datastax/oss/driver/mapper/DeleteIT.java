@@ -56,7 +56,7 @@ import org.junit.rules.TestRule;
 // Do not run LWT tests in parallel because they may interfere. Tests operate on the same row.
 @BackendRequirement(
     type = BackendType.CASSANDRA,
-    minInclusive = "3.0",
+    minInclusive = "4.0",
     description = ">= in WHERE clause not supported in legacy versions")
 public class DeleteIT extends InventoryITBase {
 
