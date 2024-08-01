@@ -56,10 +56,9 @@ pipeline {
                     }
                     axis {
                         name 'SERVER_VERSION'
-                        values '3.11',      // Latest stable Apache CassandraⓇ
-                                '4.1',       // Development Apache CassandraⓇ
-                                'dse-6.8.30', // Current DataStax Enterprise
-                                '5.0-beta1' // Beta Apache CassandraⓇ
+                        values '3.11.17',      
+				'4.0.13', 
+                                '5.0-beta1' 
                     }
                 }
                 stages {
