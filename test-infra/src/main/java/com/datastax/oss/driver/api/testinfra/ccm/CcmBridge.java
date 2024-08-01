@@ -293,7 +293,7 @@ public class CcmBridge implements AutoCloseable {
   public void start() {
     if (started.compareAndSet(false, true)) {
       List<String> cmdAndArgs = Lists.newArrayList("start", jvmArgs, "--wait-for-binary-proto");
-      cmdAndArgs.add(String.format("--jvm-version=%d", getJavaVersionToUse()));
+      updateJvmVersion(cmdAndArgs);
       try {
         execute(cmdAndArgs.toArray(new String[0]));
       } catch (RuntimeException re) {
@@ -324,15 +324,13 @@ public class CcmBridge implements AutoCloseable {
 
   public void start(int n) {
     List<String> cmdAndArgs = Lists.newArrayList("node" + n, "start");
-    cmdAndArgs.add(String.format("--jvm-version=%d", getJavaVersionToUse()));
+    updateJvmVersion(cmdAndArgs);
     execute(cmdAndArgs.toArray(new String[0]));
   }
 
-  private int getJavaVersionToUse() {
-    if (VERSION.getMajor() >= 5 && !DSE_ENABLEMENT) {
-      return 11;
-    }
-    return 8;
+  private void updateJvmVersion(List<String> cmdAndArgs) {
+    overrideJvmVersionForDseWorkloads()
+        .ifPresent(jvmVersion -> cmdAndArgs.add(String.format("--jvm_version=%d", jvmVersion)));
   }
 
   public void stop(int n) {
@@ -414,10 +412,7 @@ public class CcmBridge implements AutoCloseable {
       executor.setStreamHandler(streamHandler);
       executor.setWatchdog(watchDog);
 
-      Map<String, String> env = new LinkedHashMap<>(System.getenv());
-      env.put("JAVA_HOME", System.getProperty(String.format("JAVA%d_HOME", getJavaVersionToUse())));
-      LOG.info("Executing ccm command: {}", cli);
-      int retValue = executor.execute(cli, env);
+      int retValue = executor.execute(cli);
       if (retValue != 0) {
         LOG.error("Non-zero exit code ({}) returned from executing ccm command: {}", retValue, cli);
       }
@@ -455,6 +450,44 @@ public class CcmBridge implements AutoCloseable {
       LOG.warn("Failure to write keystore, SSL-enabled servers may fail to start.", e);
     }
     return f;
+  }
+
+  /**
+   * Get the current JVM major version (1.8.0_372 -> 8, 11.0.19 -> 11)
+   *
+   * @return major version of current JVM
+   */
+  private static int getCurrentJvmMajorVersion() {
+    String version = System.getProperty("java.version");
+    if (version.startsWith("1.")) {
+      version = version.substring(2, 3);
+    } else {
+      int dot = version.indexOf(".");
+      if (dot != -1) {
+        version = version.substring(0, dot);
+      }
+    }
+    return Integer.parseInt(version);
+  }
+
+  private Optional<Integer> overrideJvmVersionForDseWorkloads() {
+    if (getCurrentJvmMajorVersion() <= 8) {
+      return Optional.empty();
+    }
+
+    if (!DSE_ENABLEMENT || !getDseVersion().isPresent()) {
+      return Optional.empty();
+    }
+
+    if (getDseVersion().get().compareTo(Version.parse("6.8.19")) < 0) {
+      return Optional.empty();
+    }
+
+    if (dseWorkloads.contains("graph")) {
+      return Optional.of(8);
+    }
+
+    return Optional.empty();
   }
 
   private static String IN_MS_STR = "_in_ms";
