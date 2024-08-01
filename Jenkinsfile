@@ -33,7 +33,7 @@ def executeTests() {
     	. ~/env.txt
    	printenv | sort
   	mvn -B -V install -DskipTests -Dmaven.javadoc.skip=true
-   	jabba use openjdk@1.11.0
+   	jabba use ${TEST_JAVA_VERSION}
     	printenv | sort
 	mvn -B -V verify -T 1 -Ptest-jdk-''' + testJavaVersion +
             ''' -DtestJavaHome=''' + testJavaHome +
