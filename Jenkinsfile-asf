@@ -40,11 +40,21 @@ def executeTests() {
             ''' -Dccm.version=''' + serverVersion + ''' -Dccm.dse=''' + ccmIsDse + ''' -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=true'''
 }
 
+// branch pattern for cron
+// should match 3.x, 4.x, 4.5.x, etc
+def branchPatternCron() {
+  ~"((\\d+(\\.[\\dx]+)+))"
+}
+
 pipeline {
     agent {
 	label 'cassandra-amd64-large'
     }
 
+  triggers {
+    // schedules only run against release branches (i.e. 3.x, 4.x, 4.5.x, etc.)
+    parameterizedCron(branchPatternCron().matcher(env.BRANCH_NAME).matches() ? "@weekly" : "")
+  }
 
     stages {
         stage('Matrix') {
