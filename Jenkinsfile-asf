@@ -66,18 +66,17 @@ pipeline {
 
 
 def executeTests() {
-    def testJavaHome = sh(label: 'Get TEST_JAVA_HOME', script: "jabba which ${TEST_JAVA_VERSION}", returnStdout: true).trim()
     def testJavaVersion = (TEST_JAVA_VERSION =~ /openjdk@(?:1\.)?(\d+)/)[0][1]
     def serverVersion = env.SERVER_VERSION
     def script = '''
+	. ~/.jabba/jabba.sh
     	. ~/env.txt
    	printenv | sort
   	mvn -B -V install -DskipTests -Dmaven.javadoc.skip=true
    	jabba use ${TEST_JAVA_VERSION}
     	printenv | sort
 	mvn -B -V verify -T 1 -Ptest-jdk-''' + testJavaVersion +
-            ''' -DtestJavaHome=''' + testJavaHome +
-            ''' -Dccm.version=''' + serverVersion + ''' -Dccm.dse=false -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=true'''
+            ''' -DtestJavaHome=$(jabba which ${TEST_JAVA_VERSION}) -Dccm.version=''' + serverVersion + ''' -Dccm.dse=false -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=true'''
     sh 'docker exec janehe/cassandra-java-driver-dev-env ${script}'
 }
 
