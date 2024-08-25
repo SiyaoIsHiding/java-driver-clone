@@ -78,7 +78,7 @@ def executeTests() {
 	mvn -B -V verify -T 1 -Ptest-jdk-''' + testJavaVersion +
             ''' -DtestJavaHome=\$(jabba which ${TEST_JAVA_VERSION}) -Dccm.version=''' + serverVersion + ''' -Dccm.dse=false -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=true'''
 	echo script
-    sh 'docker exec janehe/cassandra-java-driver-dev-env ${script}'
+    sh "docker exec janehe/cassandra-java-driver-dev-env ${script}"
 }
 
 // branch pattern for cron
