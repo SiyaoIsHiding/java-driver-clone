@@ -19,37 +19,15 @@
  * under the License.
  */
 
-
-def executeTests() {
-    def testJavaHome = sh(label: 'Get TEST_JAVA_HOME', script: "jabba which ${TEST_JAVA_VERSION}", returnStdout: true).trim()
-    def testJavaVersion = (TEST_JAVA_VERSION =~ /.*@1\.(\d+)/)[0][1]
-    def serverVersion = env.SERVER_VERSION
-    sh '''
-    	. ~/env.txt
-   	printenv | sort
-  	mvn -B -V install -DskipTests -Dmaven.javadoc.skip=true
-   	jabba use ${TEST_JAVA_VERSION}
-    	printenv | sort
-	mvn -B -V verify -T 1 -Ptest-jdk-''' + testJavaVersion +
-            ''' -DtestJavaHome=''' + testJavaHome +
-            ''' -Dccm.version=''' + serverVersion + ''' -Dccm.dse=false -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=true'''
-}
-
-// branch pattern for cron
-// should match 3.x, 4.x, 4.5.x, etc
-def branchPatternCron() {
-  ~"((\\d+(\\.[\\dx]+)+))"
-}
-
 pipeline {
     agent {
-	label 'cassandra-amd64-large'
+        label 'cassandra-small'
     }
 
-  triggers {
-    // schedules only run against release branches (i.e. 3.x, 4.x, 4.5.x, etc.)
-    cron(branchPatternCron().matcher(env.BRANCH_NAME).matches() ? "@weekly" : "")
-  }
+    triggers {
+        // schedules only run against release branches (i.e. 3.x, 4.x, 4.5.x, etc.)
+        cron(branchPatternCron().matcher(env.BRANCH_NAME).matches() ? "@weekly" : "")
+    }
 
     stages {
         stage('Matrix') {
@@ -57,22 +35,21 @@ pipeline {
                 axes {
                     axis {
                         name 'TEST_JAVA_VERSION'
-                        values 'zulu@1.8', 'openjdk@1.11.0', 'openjdk@1.17.0'
+                        values 'zulu@1.8', 'openjdk@1.11.0'
                     }
                     axis {
                         name 'SERVER_VERSION'
-                        values '3.11.17',      
-				'4.0.13', 
-                                '5.0-beta1' 
+                        values '2.1', '3.0', '3.11', '4.0'
                     }
                 }
                 stages {
                     stage('Tests') {
-			agent {
-				docker {
-            				image 'janehe/cassandra-java-driver-dev-env'
-        			}
-			}
+                        agent {
+                            label 'cassandra-medium'
+//                            docker {
+//                                image 'janehe/cassandra-java-driver-dev-env'
+//                            }
+                        }
                         steps {
                             script {
                                 executeTests()
@@ -85,4 +62,24 @@ pipeline {
             }
         }
     }
+}
+
+def executeTests() {
+    def testJavaHome = sh(label: 'Get TEST_JAVA_HOME', script: "jabba which ${TEST_JAVA_VERSION}", returnStdout: true).trim()
+    def testJavaVersion = (TEST_JAVA_VERSION =~ /.*@1\.(\d+)/)[0][1]
+    def serverVersion = env.SERVER_VERSION
+    def script = '''
+    	. ~/env.txt
+   	printenv | sort
+  	mvn -B -V install -DskipTests -Dmaven.javadoc.skip=true
+   	jabba use ${TEST_JAVA_VERSION}
+    	printenv | sort
+	mvn -B -V verify -T 1 -Dcassandra.version=''' + serverVersion + ''' -Ddse=false -Dmaven.test.failure.ignore=true -Dmaven.javadoc.skip=true'''
+    sh 'docker exec janehe/cassandra-java-driver-dev-env ${script}'
+}
+
+// branch pattern for cron
+// should match 3.x, 4.x, 4.5.x, etc
+def branchPatternCron() {
+    ~"((\\d+(\\.[\\dx]+)+))"
 }
