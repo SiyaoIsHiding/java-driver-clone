@@ -21,7 +21,7 @@
 
 pipeline {
     agent {
-        label 'cassandra-small'
+        label 'cassandra-large'
     }
 
   triggers {
@@ -47,7 +47,7 @@ pipeline {
                 stages {
                     stage('Tests') {
                         agent {
-                            label 'cassandra-medium'
+                            label 'cassandra-large'
                         }
                         steps {
                             script {
