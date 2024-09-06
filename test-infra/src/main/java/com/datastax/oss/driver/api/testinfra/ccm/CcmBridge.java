@@ -356,7 +356,7 @@ public class CcmBridge implements AutoCloseable {
             + String.join(" ", args)
             + " --config-dir="
             + configDirectory.toFile().getAbsolutePath();
-
+    LOG.info(command);
     execute(CommandLine.parse(command));
   }
 
