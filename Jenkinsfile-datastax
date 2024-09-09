@@ -111,7 +111,7 @@ def buildDriver(jabbaVersion) {
 }
 
 def executeTests() {
-  def testJavaHome = sh(label: 'Get TEST_JAVA_HOME',script: '''#!/bin/bash -le
+  def testJavaHome = sh(label: 'Get TEST_JAVA_HOME',script: '''#!/bin/bash -lex
     . ${JABBA_SHELL}
     jabba which ${JABBA_VERSION}''', returnStdout: true).trim()
   def testJavaVersion = (JABBA_VERSION =~ /.*\.(\d+)/)[0][1]
