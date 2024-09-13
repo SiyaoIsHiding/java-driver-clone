@@ -24,7 +24,6 @@ pipeline {
         label 'cassandra-small'
     }
 
-// try again for arm
     triggers {
         // schedules only run against release branches (i.e. 3.x, 4.x, 4.5.x, etc.)
         cron(branchPatternCron().matcher(env.BRANCH_NAME).matches() ? "@weekly" : "")
