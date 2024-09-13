@@ -19,6 +19,7 @@
  * under the License.
  */
 
+// arm pls
 pipeline {
     agent {
         label 'cassandra-small'
