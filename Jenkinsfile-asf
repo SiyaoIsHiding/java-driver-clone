@@ -19,7 +19,7 @@
  * under the License.
  */
 
-// arm pls
+// what do you mean it's not git
 pipeline {
     agent {
         label 'cassandra-small'
