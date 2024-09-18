@@ -24,10 +24,10 @@ pipeline {
         label 'cassandra-small'
     }
 
-  triggers {
-    // schedules only run against release branches (i.e. 3.x, 4.x, 4.5.x, etc.)
-    cron(branchPatternCron().matcher(env.BRANCH_NAME).matches() ? "@weekly" : "")
-  }
+    triggers {
+        // schedules only run against release branches (i.e. 3.x, 4.x, 4.5.x, etc.)
+        cron(branchPatternCron().matcher(env.BRANCH_NAME).matches() ? '@weekly' : '')
+    }
 
     stages {
         stage('Matrix') {
@@ -35,13 +35,13 @@ pipeline {
                 axes {
                     axis {
                         name 'TEST_JAVA_VERSION'
-                        values 'openjdk@1.8.0-292', 'openjdk@1.11.0-9', 'openjdk@17'
+                        values  'openjdk@1.8.0-292', 'openjdk@1.11.0-9', 'openjdk@17'
                     }
                     axis {
                         name 'SERVER_VERSION'
-                        values '3.11.17',      
-                '4.0.13', 
-                                '5.0-beta1' 
+                        values  '3.11.17',
+                                '4.0.13',
+                                '5.0-beta1'
                     }
                 }
                 stages {
@@ -63,8 +63,6 @@ pipeline {
     }
 }
 
-
-
 def executeTests() {
     def testJavaMajorVersion = (TEST_JAVA_VERSION =~ /@(?:1\.)?(\d+)/)[0][1]
     def container_id = sh(script: "docker run -td -e TEST_JAVA_VERSION=${TEST_JAVA_VERSION} -e SERVER_VERSION=${SERVER_VERSION} -e TEST_JAVA_MAJOR_VERSION=${testJavaMajorVersion} -v \$(pwd):/home/docker/cassandra-java-driver apache.jfrog.io/cassan-docker/apache/cassandra-java-driver-testing-ubuntu2204 'sleep 2h'", returnStdout: true).trim()
@@ -75,5 +73,5 @@ def executeTests() {
 // branch pattern for cron
 // should match 3.x, 4.x, 4.5.x, etc
 def branchPatternCron() {
-  ~"((\\d+(\\.[\\dx]+)+))"
+    ~'((\\d+(\\.[\\dx]+)+))'
 }
