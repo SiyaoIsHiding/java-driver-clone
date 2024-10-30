@@ -39,9 +39,10 @@ pipeline {
                     }
                     axis {
                         name 'SERVER_VERSION'
-                        values  '3.11.17',
-                                '4.0.14',
-                                '5.0.2'
+                        values  '3.11',
+                                '4.0',
+                                '4.1',
+                                '5.0'
                     }
                 }
                 stages {
