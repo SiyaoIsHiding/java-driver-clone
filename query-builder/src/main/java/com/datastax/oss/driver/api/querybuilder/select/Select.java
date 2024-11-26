@@ -154,7 +154,7 @@ public interface Select extends OngoingSelection, OngoingWhereClause<Select>, Bu
   @NonNull
   Select orderByAnnOf(@NonNull String columnName, @NonNull CqlVector<?> ann);
 
-  /** Adds the ORDER BY ... ANN OF ... clause */
+  /** Adds the ORDER BY ... ANN OF ... clause, usually used for vector search */
   @NonNull
   Select orderByAnnOf(@NonNull CqlIdentifier columnId, @NonNull CqlVector<?> ann);
   /**
