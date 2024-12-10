@@ -31,7 +31,7 @@ pipeline {
 
     stages {
         stage('Matrix') {
-            when { not { branch 'master' } }
+            when { not { branch '4.x' } }
             matrix {
                 axes {
                     axis {
